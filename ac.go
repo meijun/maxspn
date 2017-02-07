@@ -81,10 +81,14 @@ func (ac AC) Pr(assign Assign) float64 {
 			val[i] = mul
 		case AddNode:
 			sum := 0.0
+			max := math.Inf(-1)
 			for _, ai := range n {
-				sum += math.Exp(val[ai])
+				max = math.Max(max, val[ai])
 			}
-			val[i] = math.Log(sum)
+			for _, ai := range n {
+				sum += math.Exp(val[ai] - max)
+			}
+			val[i] = math.Log(sum) + max
 		}
 	}
 	return val[len(val)-1]

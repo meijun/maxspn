@@ -14,7 +14,7 @@ type SPN []Node
 type SID int
 
 type SumEdge struct {
-	Weight float64
+	Weight float64 // in log
 	Node   Node
 }
 type PrdEdge struct {
@@ -54,18 +54,18 @@ func AC2SPN(ac AC) SPN {
 				Kth:   n.Kth,
 				Value: n.Value,
 			}
-			we[i] = 1
+			we[i] = 0
 		case NumNode:
-			we[i] = float64(n)
+			we[i] = math.Log(float64(n))
 		case MulNode:
 			prd := &Prd{}
-			w := 1.0
+			w := 0.0
 			for _, ci := range n {
 				if _, ok := ac[ci].(NumNode); !ok {
 					prd.Edges = append(prd.Edges, PrdEdge{ns[ci]})
 				}
 				if _, ok := ac[ci].(AddNode); !ok {
-					w *= we[ci]
+					w += we[ci]
 				}
 			}
 			ns[i] = prd
@@ -101,11 +101,15 @@ func (spn SPN) Pr(assign Assign) float64 {
 		case *Trm:
 			pr[n.ID()] = math.Log(assign[n.Kth][n.Value])
 		case *Sum:
-			val := 0.0
+			max := math.Inf(-1)
 			for _, e := range n.Edges {
-				val += e.Weight * math.Exp(pr[e.Node.ID()])
+				max = math.Max(max, e.Weight+pr[e.Node.ID()])
 			}
-			pr[n.ID()] = math.Log(val)
+			sum := 0.0
+			for _, e := range n.Edges {
+				sum += math.Exp(e.Weight + pr[e.Node.ID()] - max)
+			}
+			pr[n.ID()] = math.Log(sum) + max
 		case *Prd:
 			val := 0.0
 			for _, e := range n.Edges {
