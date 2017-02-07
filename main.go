@@ -28,7 +28,7 @@ func main() {
 	fs := []func(SPN) float64{pk, mm, sm, nb}
 	ss := make([]SPN, len(DataNames))
 	for i, n := range DataNames {
-		ss[i] = AC2SPN(LoadAC(n))
+		ss[i] = AC2SPN(LoadAC("data/" + n + ".ac"))
 	}
 	for _, f := range fs {
 		res := make([]float64, len(ss))
