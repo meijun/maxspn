@@ -101,15 +101,9 @@ func (spn SPN) Pr(assign Assign) float64 {
 		case *Trm:
 			pr[n.ID()] = math.Log(assign[n.Kth][n.Value])
 		case *Sum:
-			max := math.Inf(-1)
-			for _, e := range n.Edges {
-				max = math.Max(max, e.Weight+pr[e.Node.ID()])
-			}
-			sum := 0.0
-			for _, e := range n.Edges {
-				sum += math.Exp(e.Weight + pr[e.Node.ID()] - max)
-			}
-			pr[n.ID()] = math.Log(sum) + max
+			pr[n.ID()] = logSumExpF(len(n.Edges), func(k int) float64 {
+				return n.Edges[k].Weight + pr[n.Edges[k].Node.ID()]
+			})
 		case *Prd:
 			val := 0.0
 			for _, e := range n.Edges {

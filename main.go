@@ -4,6 +4,10 @@ import (
 	"log"
 )
 
+func init() {
+	log.SetFlags(log.Lshortfile | log.Ltime)
+}
+
 var DataNames = []string{
 	"accidents", "ad", "baudio", "bbc", "bnetflix",
 	"book", "c20ng", "cr52", "cwebkb", "dna",
@@ -33,6 +37,7 @@ func main() {
 	for _, f := range fs {
 		res := make([]float64, len(ss))
 		for i, s := range ss {
+			log.Println(i)
 			res[i] = f(s)
 		}
 		log.Println(res)

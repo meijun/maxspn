@@ -80,18 +80,24 @@ func (ac AC) Pr(assign Assign) float64 {
 			}
 			val[i] = mul
 		case AddNode:
-			sum := 0.0
-			max := math.Inf(-1)
-			for _, ai := range n {
-				max = math.Max(max, val[ai])
-			}
-			for _, ai := range n {
-				sum += math.Exp(val[ai] - max)
-			}
-			val[i] = math.Log(sum) + max
+			val[i] = logSumExpF(len(n), func(k int) float64 {
+				return val[n[k]]
+			})
 		}
 	}
 	return val[len(val)-1]
+}
+
+func logSumExpF(n int, f func(i int) float64) float64 {
+	max := math.Inf(-1)
+	for i := 0; i < n; i++ {
+		max = math.Max(max, f(i))
+	}
+	sum := 0.0
+	for i := 0; i < n; i++ {
+		sum += math.Exp(f(i) - max)
+	}
+	return math.Log(sum) + max
 }
 
 func parseInt(s string) int {

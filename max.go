@@ -37,17 +37,15 @@ func partition(spn SPN) []float64 {
 	for i, n := range spn {
 		switch n := n.(type) {
 		case *Trm:
-			prt[i] = 1
+			prt[i] = 0
 		case *Sum:
+			prt[i] = logSumExpF(len(n.Edges), func(k int) float64 {
+				return n.Edges[k].Weight + prt[n.Edges[k].Node.ID()]
+			})
+		case *Prd:
 			val := 0.0
 			for _, e := range n.Edges {
-				val += e.Weight * prt[e.Node.ID()]
-			}
-			prt[i] = val
-		case *Prd:
-			val := 1.0
-			for _, e := range n.Edges {
-				val *= prt[e.Node.ID()]
+				val += prt[e.Node.ID()]
 			}
 			prt[i] = val
 		}
@@ -68,10 +66,10 @@ func prb1(spn SPN, prt []float64) X {
 				}
 				x[n.Kth] = n.Value
 			case *Sum:
-				r := rand.Float64() * prt[i]
-				crt := 0.0
+				r := math.Log(rand.Float64()) + prt[i]
+				crt := math.Inf(-1)
 				for _, e := range n.Edges {
-					crt += e.Weight * prt[e.Node.ID()]
+					crt = logSumExp(crt, e.Weight+prt[e.Node.ID()])
 					if r < crt {
 						reach[e.Node.ID()] = true
 						break
@@ -87,17 +85,23 @@ func prb1(spn SPN, prt []float64) X {
 	return x
 }
 
+func logSumExp(as ...float64) float64 {
+	return logSumExpF(len(as), func(i int) float64 {
+		return as[i]
+	})
+}
+
 func MaxMax(spn SPN) X {
 	prt := make([]float64, len(spn))
 	branch := make([]SID, len(spn))
 	for i, n := range spn {
 		switch n := n.(type) {
 		case *Trm:
-			prt[i] = 1
+			prt[i] = 0
 		case *Sum:
 			eBest, pBest := SID(-1), math.Inf(-1)
 			for _, e := range n.Edges {
-				crt := e.Weight * prt[e.Node.ID()]
+				crt := e.Weight + prt[e.Node.ID()]
 				if pBest < crt {
 					pBest = crt
 					eBest = e.Node.ID()
@@ -105,9 +109,9 @@ func MaxMax(spn SPN) X {
 			}
 			branch[i] = eBest
 		case *Prd:
-			val := 1.0
+			val := 0.0
 			for _, e := range n.Edges {
-				val *= prt[e.Node.ID()]
+				val += prt[e.Node.ID()]
 			}
 			prt[i] = val
 		}
@@ -152,7 +156,7 @@ func SumMax(spn SPN) X {
 			case *Sum:
 				eBest, pBest := SID(-1), math.Inf(-1)
 				for _, e := range n.Edges {
-					crt := e.Weight * prt[e.Node.ID()]
+					crt := e.Weight + prt[e.Node.ID()]
 					if pBest < crt {
 						pBest = crt
 						eBest = e.Node.ID()
