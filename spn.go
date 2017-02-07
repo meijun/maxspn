@@ -58,7 +58,7 @@ func AC2SPN(ac AC) SPN {
 		case NumNode:
 			we[i] = math.Log(float64(n))
 		case MulNode:
-			prd := &Prd{}
+			prd := &Prd{Edges: make([]PrdEdge, 0, len(n))}
 			w := 0.0
 			for _, ci := range n {
 				if _, ok := ac[ci].(NumNode); !ok {
@@ -71,7 +71,7 @@ func AC2SPN(ac AC) SPN {
 			ns[i] = prd
 			we[i] = w
 		case AddNode:
-			sum := &Sum{}
+			sum := &Sum{Edges: make([]SumEdge, 0, len(n))}
 			for _, ci := range n {
 				if _, ok := ac[ci].(NumNode); !ok {
 					sum.Edges = append(sum.Edges, SumEdge{we[ci], ns[ci]})
@@ -83,7 +83,7 @@ func AC2SPN(ac AC) SPN {
 	if _, ok := ac[nn-1].(AddNode); !ok {
 		ns = append(ns, &Sum{Edges: []SumEdge{{we[nn-1], ns[nn-1]}}})
 	}
-	spn := SPN{}
+	spn := make(SPN, 0, nn)
 	for _, n := range ns {
 		if n != nil {
 			n.SetID(SID(len(spn)))
