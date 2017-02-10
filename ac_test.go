@@ -67,3 +67,10 @@ func TestAC_Pr(t *testing.T) {
 		t.Fail() // from nltcs10.q
 	}
 }
+
+func TestAC_Info(t *testing.T) {
+	//for _, name := range DataNames {
+	//	t.Log(LoadAC("data/" + name + ".ac").Info())
+	//}
+	t.Log(LoadAC("data/nltcs.ac").Info())
+}

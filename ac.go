@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"math/big"
 	"strconv"
 )
 
@@ -86,6 +87,62 @@ func (ac AC) Pr(assign Assign) float64 {
 		}
 	}
 	return val[len(val)-1]
+}
+
+func (ac AC) Info() (varNode, numNode, mulNode, addNode int, mulEdge, addEdge Stat) {
+	me := []float64{}
+	ae := []float64{}
+	sc := make([]*big.Int, len(ac))
+	for i, n := range ac {
+		switch n := n.(type) {
+		case VarNode:
+			varNode++
+			sc[i] = big.NewInt(0)
+			sc[i].Lsh(big.NewInt(1), uint(n.Kth))
+			//sc[i] = 1 << uint(n.Kth)
+		case NumNode:
+			numNode++
+			sc[i] = big.NewInt(0)
+		case MulNode:
+			mulNode++
+			me = append(me, float64(len(n)))
+			s := big.NewInt(0)
+			//s := 0
+			for _, ci := range n {
+				if big.NewInt(0).And(s, sc[ci]).Cmp(big.NewInt(0)) != 0 {
+					//if s & sc[ci] != 0 {
+					log.Fatal("mul", i, s, ci, sc[ci])
+				}
+				s.Or(s, sc[ci])
+				//s |= sc[ci]
+			}
+			sc[i] = s
+		case AddNode:
+			addNode++
+			ae = append(ae, float64(len(n)))
+			s := big.NewInt(-1)
+			//s := -1
+			for _, ci := range n {
+				if s.Cmp(big.NewInt(-1)) == 0 {
+					//if s == -1 {
+					s = sc[ci]
+				} else {
+					if s.Cmp(sc[ci]) != 0 {
+						//if s != sc[ci] {
+						log.Fatal("add", i, s, ci, sc[ci])
+					}
+				}
+			}
+			if s.Cmp(big.NewInt(-1)) == 0 || s.Cmp(big.NewInt(0)) == 0 {
+				//if s == -1 || s == 0 {
+				log.Fatal("add", s)
+			}
+			sc[i] = s
+		}
+	}
+	mulEdge = analyse(me)
+	addEdge = analyse(ae)
+	return
 }
 
 func logSumExpF(n int, f func(i int) float64) float64 {

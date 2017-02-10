@@ -51,3 +51,14 @@ func TestSPN_Pr(t *testing.T) {
 		}
 	}
 }
+
+func TestSPN_Info(t *testing.T) {
+	//for _, name := range DataNames {
+	//	t.Log(AC2SPN(LoadAC("data/"+name+".ac")).Info())
+	//}
+	t.Log(AC2SPN(LoadAC("data/nltcs.ac")).Info())
+}
+
+func TestSPN_SaveAsAC(t *testing.T) {
+	AC2SPN(LoadAC("data/nltcs.ac")).SaveAsAC("data/nltcs.ac2")
+}

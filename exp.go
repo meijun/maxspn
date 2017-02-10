@@ -3,27 +3,24 @@ package main
 import (
 	"io/ioutil"
 	"log"
+	"math"
 	"os/exec"
 )
 
 var DataNames = []string{
-	"accidents", "ad", "baudio", "bbc", "bnetflix",
-	"book", "c20ng", "cr52", "cwebkb", "dna",
-	"jester", "kdd", "kosarek", "msnbc", "msweb",
-	"nltcs", "plants", "pumsb_star", "tmovie", "tretail",
+	"nltcs", "msnbc", "kdd", "plants", "baudio", "bnetflix", "jester", "accidents", "tretail", "pumsb_star",
+	"dna", "kosarek", "msweb", "book", "tmovie", "cwebkb", "cr52", "c20ng", "bbc", "ad",
 }
 var VarCnt = []int{
-	111, 1556, 100, 1058, 100,
-	500, 910, 889, 839, 180,
-	100, 64, 190, 17, 294,
-	16, 69, 163, 500, 135,
+	16, 17, 64, 69, 100, 100, 100, 111, 135, 163,
+	180, 190, 294, 500, 500, 839, 889, 910, 1058, 1556,
 }
 
 func LibraMPE() {
 	res := make([]float64, len(DataNames))
 	for i, name := range DataNames {
-		log.Println(i)
 		res[i] = libraMPE1(name, VarCnt[i])
+		log.Println(i, res[i])
 	}
 	log.Println(res)
 }
@@ -39,10 +36,12 @@ func libraMPE1(name string, varCnt int) float64 {
 	ioutil.WriteFile(name+".ev", star, 0666)
 	//cmd := exec.Command("pwd")
 	//cmd := exec.Command("libra", "fstats", "-i", name+".ac")
+	AC2SPN(LoadAC(name + ".ac")).SaveAsAC(name + ".ac2")
 	cmd := exec.Command("libra", "acquery", "-m", name+".ac", "-ev", name+".ev", "-mpe")
 	res, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return math.Inf(-1)
 	}
 	log.Println(string(res))
 	x := make([]int, varCnt)
