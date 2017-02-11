@@ -1,8 +1,10 @@
 package main
 
 import (
+	"log"
 	"math"
 	"math/rand"
+	"reflect"
 )
 
 type X []int
@@ -214,4 +216,103 @@ func NaiveBayes(spn SPN, stateCnt int) X {
 		x[i] = sBest
 	}
 	return x
+}
+
+type XP struct {
+	X X
+	P float64
+}
+
+func BeamSearch(spn SPN, xps []XP, schema X, beamSize int) XP {
+	xpBest := XP{X{}, math.Inf(-1)}
+	for i := 0; len(xps) > 0; i++ {
+		log.Printf("Round %d: %d\n", i, len(xps))
+		xps = uniqueX(xps)
+		xps = topK(xps, beamSize)
+		xp1 := topK(xps, 1)
+		if xpBest.P < xp1[0].P {
+			xpBest = xp1[0]
+		}
+		xps = nextGens(xps, spn, schema)
+	}
+	return xpBest
+}
+
+func PrbKInit(spn SPN, k int) []XP {
+	prt := partition(spn)
+	res := make([]XP, k)
+	for times := 0; times < k; times++ {
+		x := prb1(spn, prt)
+		p := spn.Pr(X2Assign(x, 2))
+		res[times] = XP{x, p}
+	}
+	return res
+}
+func nextGens(xps []XP, spn SPN, schema X) []XP {
+	res := []XP{}
+	resChan := make([]chan []XP, len(xps))
+	for i, xp := range xps {
+		ch := make(chan []XP)
+		go nextGen(xp, spn, schema, ch)
+		resChan[i] = ch
+	}
+	for _, ch := range resChan {
+		res = append(res, <-ch...)
+	}
+	return res
+}
+func nextGen(xp XP, spn SPN, schema X, ch chan []XP) {
+	res := []XP{}
+	for i, cnt := range schema {
+		for xi := 0; xi < cnt; xi++ {
+			if xp.X[i] != xi {
+				nx := make(X, len(xp.X))
+				copy(nx, xp.X)
+				nx[i] = xi
+				np := spn.Pr(XSchema2Assign(nx, schema))
+				if np > xp.P {
+					res = append(res, XP{nx, np})
+				}
+			}
+		}
+	}
+	ch <- res
+}
+func XSchema2Assign(x X, schema X) Assign {
+	as := make(Assign, len(x))
+	for i, xi := range x {
+		as[i] = make([]float64, schema[i])
+		as[i][xi] = 1
+	}
+	return as
+}
+func uniqueX(xps []XP) []XP {
+	is := make([]bool, len(xps))
+	res := make([]XP, 0, len(xps))
+	for i, xpi := range xps {
+		is[i] = true
+		for j, xpj := range xps[:i] {
+			if is[j] && reflect.DeepEqual(xpi.X, xpj.X) {
+				is[i] = false
+				break
+			}
+		}
+		if is[i] {
+			res = append(res, xpi)
+		}
+	}
+	return res
+}
+func topK(xps []XP, k int) []XP {
+	if k > len(xps) {
+		k = len(xps)
+	}
+	for i := 0; i < k; i++ {
+		for j := i + 1; j < len(xps); j++ {
+			if xps[i].P < xps[j].P {
+				xps[i], xps[j] = xps[j], xps[i]
+			}
+		}
+	}
+	return xps[:k]
 }

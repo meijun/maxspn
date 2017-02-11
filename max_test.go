@@ -30,3 +30,13 @@ func TestNaiveBayes(t *testing.T) {
 	x := NaiveBayes(spn, 2)
 	t.Log(x, spn.Pr(X2Assign(x, 2)))
 }
+
+func TestBeamSearch(t *testing.T) {
+	spn := AC2SPN(LoadAC("data/nltcs.ac"))
+	varCnt := 16
+	schema := make(X, varCnt)
+	for i := 0; i < varCnt; i++ {
+		schema[i] = 2
+	}
+	t.Log(BeamSearch(spn, PrbKInit(spn, 100), schema, 16))
+}
