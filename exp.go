@@ -16,6 +16,23 @@ var VarCnt = []int{
 	180, 190, 294, 500, 500, 839, 889, 910, 1058, 1556,
 }
 
+func BSearch() {
+	res := make([]float64, len(DataNames))
+	for i, name := range DataNames {
+		log.Println(i, name)
+		spn := AC2SPN(LoadAC("data/" + name + ".ac"))
+		cnt := VarCnt[i]
+		schema := make(X, cnt)
+		for i := 0; i < cnt; i++ {
+			schema[i] = 2
+		}
+		xp := BeamSearch(spn, PrbKInit(spn, 1000), schema, 31)
+		log.Println(xp)
+		res[i] = xp.P
+	}
+	log.Println(res)
+}
+
 func LibraMPE() {
 	res := make([]float64, len(DataNames))
 	for i, name := range DataNames {

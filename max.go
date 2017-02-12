@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/rand"
 	"reflect"
+	"sync"
 )
 
 type X []int
@@ -226,7 +227,7 @@ type XP struct {
 func BeamSearch(spn SPN, xps []XP, schema X, beamSize int) XP {
 	xpBest := XP{X{}, math.Inf(-1)}
 	for i := 0; len(xps) > 0; i++ {
-		log.Printf("Round %d: %d\n", i, len(xps))
+		log.Printf("Round %d, len: %d, pBest %f\n", i, len(xps), xpBest.P)
 		xps = uniqueX(xps)
 		xps = topK(xps, beamSize)
 		xp1 := topK(xps, 1)
@@ -241,11 +242,17 @@ func BeamSearch(spn SPN, xps []XP, schema X, beamSize int) XP {
 func PrbKInit(spn SPN, k int) []XP {
 	prt := partition(spn)
 	res := make([]XP, k)
+	wg := sync.WaitGroup{}
 	for times := 0; times < k; times++ {
-		x := prb1(spn, prt)
-		p := spn.Pr(X2Assign(x, 2))
-		res[times] = XP{x, p}
+		wg.Add(1)
+		go func(i int) {
+			x := prb1(spn, prt)
+			p := spn.Pr(X2Assign(x, 2))
+			res[i] = XP{x, p}
+			wg.Done()
+		}(times)
 	}
+	wg.Wait()
 	return res
 }
 func nextGens(xps []XP, spn SPN, schema X) []XP {
@@ -253,7 +260,7 @@ func nextGens(xps []XP, spn SPN, schema X) []XP {
 	resChan := make([]chan []XP, len(xps))
 	for i, xp := range xps {
 		ch := make(chan []XP)
-		go nextGen(xp, spn, schema, ch)
+		go nextGenP(xp, spn, schema, ch)
 		resChan[i] = ch
 	}
 	for _, ch := range resChan {
@@ -277,6 +284,35 @@ func nextGen(xp XP, spn SPN, schema X, ch chan []XP) {
 		}
 	}
 	ch <- res
+}
+func nextGenP(xp XP, spn SPN, schema X, ch chan []XP) {
+	res := []XP{}
+	chs := make([]chan []XP, len(schema))
+	for i, cnt := range schema {
+		chi := make(chan []XP)
+		chs[i] = chi
+		go genKth(cnt, xp, i, spn, schema, chi)
+	}
+	for i := range chs {
+		res = append(res, <-chs[i]...)
+	}
+	ch <- res
+}
+func genKth(cnt int, xp XP, i int, spn SPN, schema X, chi chan []XP) {
+	r := []XP{}
+	for xi := 0; xi < cnt; xi++ {
+		if xp.X[i] != xi {
+			nx := make(X, len(xp.X))
+			copy(nx, xp.X)
+			nx[i] = xi
+			np := spn.Pr(XSchema2Assign(nx, schema))
+			if np > xp.P {
+				//res = append(res, XP{nx, np})
+				r = append(r, XP{nx, np})
+			}
+		}
+	}
+	chi <- r
 }
 func XSchema2Assign(x X, schema X) Assign {
 	as := make(Assign, len(x))
