@@ -16,6 +16,22 @@ var VarCnt = []int{
 	180, 190, 294, 500, 500, 839, 889, 910, 1058, 1556,
 }
 
+func SumMaxBS() {
+	res := make([]float64, len(DataNames))
+	for i, name := range DataNames {
+		spn := AC2SPN(LoadAC("data/" + name + ".ac"))
+		x := SumMax(spn)
+		sch := make(X, VarCnt[i])
+		for j := range sch {
+			sch[j] = 2
+		}
+		xp := BeamSearch(spn, []XP{{x, spn.Pr(X2Assign(x, 2))}}, sch, 31)
+		log.Println(i, name, xp)
+		res[i] = xp.P
+	}
+	log.Println(res)
+}
+
 func BSearch() {
 	res := make([]float64, len(DataNames))
 	for i, name := range DataNames {
