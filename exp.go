@@ -21,11 +21,7 @@ func SumMaxBS() {
 	for i, name := range DataNames {
 		spn := AC2SPN(LoadAC("data/" + name + ".ac"))
 		x := SumMax(spn)
-		sch := make(X, VarCnt[i])
-		for j := range sch {
-			sch[j] = 2
-		}
-		xp := BeamSearch(spn, []XP{{x, spn.Pr(X2Assign(x, 2))}}, sch, 31)
+		xp := BeamSearch(spn, []XP{{x, spn.EvalX(x)}}, 31)
 		log.Println(i, name, xp)
 		res[i] = xp.P
 	}
@@ -37,12 +33,7 @@ func BSearch() {
 	for i, name := range DataNames {
 		log.Println(i, name)
 		spn := AC2SPN(LoadAC("data/" + name + ".ac"))
-		cnt := VarCnt[i]
-		schema := make(X, cnt)
-		for i := 0; i < cnt; i++ {
-			schema[i] = 2
-		}
-		xp := BeamSearch(spn, PrbKInit(spn, 1000), schema, 31)
+		xp := BeamSearch(spn, PrbK(spn, 1000), 31)
 		log.Println(xp)
 		res[i] = xp.P
 	}
@@ -85,22 +76,21 @@ func libraMPE1(name string, varCnt int) float64 {
 			x[i] = 0
 		}
 	}
-	return AC2SPN(LoadAC(name + ".ac")).Pr(X2Assign(x, 2))
+	return AC2SPN(LoadAC(name + ".ac")).EvalX(x)
 }
 
 func Exp() {
 	pk := func(spn SPN) float64 {
-		_, p := PrbK(spn, 100)
-		return p
+		return PrbKMax(spn, 100).P
 	}
 	mm := func(spn SPN) float64 {
-		return spn.Pr(X2Assign(MaxMax(spn), 2))
+		return spn.EvalX(MaxMax(spn))
 	}
 	sm := func(spn SPN) float64 {
-		return spn.Pr(X2Assign(SumMax(spn), 2))
+		return spn.EvalX(SumMax(spn))
 	}
 	nb := func(spn SPN) float64 {
-		return spn.Pr(X2Assign(NaiveBayes(spn, 2), 2))
+		return spn.EvalX(NaiveBayes(spn))
 	}
 	fs := []func(SPN) float64{pk, mm, sm, nb}
 	ss := make([]SPN, len(DataNames))

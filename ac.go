@@ -11,20 +11,21 @@ import (
 
 type ACNode interface{}
 
-type AC []ACNode
-
-type ACID int
+type AC struct {
+	Nodes  []ACNode
+	Schema []int
+}
 
 type VarNode struct {
 	Kth   int
 	Value int
 }
 type NumNode float64
-type MulNode []ACID
-type AddNode []ACID
+type MulNode []int
+type AddNode []int
 
-func LoadAC(acFile string) AC {
-	bs, err := ioutil.ReadFile(acFile)
+func LoadAC(filename string) AC {
+	bs, err := ioutil.ReadFile(filename)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -33,45 +34,55 @@ func LoadAC(acFile string) AC {
 	for string(bss[end]) != "EOF" {
 		end--
 	}
+
+	scs := bytes.Split(bss[0][1:len(bss[0])-1], []byte(" "))
+	schema := make([]int, len(scs))
+	for i, s := range scs {
+		schema[i] = parseInt(string(s))
+	}
+
 	bss = bss[1:end]
-	ac := make(AC, len(bss))
+	nodes := make([]ACNode, len(bss))
 	for i, ln := range bss {
 		bs := bytes.Split(ln, []byte(" "))
 		switch string(bs[0]) {
 		case "v":
-			ac[i] = VarNode{
+			nodes[i] = VarNode{
 				Kth:   parseInt(string(bs[1])),
 				Value: parseInt(string(bs[2])),
 			}
 		case "n":
-			ac[i] = NumNode(parseFloat(string(bs[1])))
+			nodes[i] = NumNode(parseFloat(string(bs[1])))
 		case "*":
 			mn := make(MulNode, len(bs)-1)
 			for j, v := range bs[1:] {
-				mn[j] = ACID(parseInt(string(v)))
+				mn[j] = parseInt(string(v))
 			}
-			ac[i] = mn
+			nodes[i] = mn
 		case "+":
 			an := make(AddNode, len(bs)-1)
 			for j, v := range bs[1:] {
-				an[j] = ACID(parseInt(string(v)))
+				an[j] = parseInt(string(v))
 			}
-			ac[i] = an
+			nodes[i] = an
 		}
 	}
-	return ac
+	return AC{nodes, schema}
 }
 
-type Assign [][]float64
+// Return log value
+func (ac AC) EvalX(xs []int) float64 {
+	val := ac.Eval(X2Ass(xs, ac.Schema))
+	return val[len(val)-1]
+}
 
-// Return log(Pr(x))
-func (ac AC) Pr(assign Assign) float64 {
-	nn := len(ac)
+func (ac AC) Eval(ass [][]float64) []float64 {
+	nn := len(ac.Nodes)
 	val := make([]float64, nn)
-	for i, n := range ac {
+	for i, n := range ac.Nodes {
 		switch n := n.(type) {
 		case VarNode:
-			val[i] = math.Log(assign[n.Kth][n.Value])
+			val[i] = math.Log(ass[n.Kth][n.Value])
 		case NumNode:
 			val[i] = math.Log(float64(n))
 		case MulNode:
@@ -86,14 +97,14 @@ func (ac AC) Pr(assign Assign) float64 {
 			})
 		}
 	}
-	return val[len(val)-1]
+	return val
 }
 
 func (ac AC) Info() (varNode, numNode, mulNode, addNode int, mulEdge, addEdge Stat) {
 	me := []float64{}
 	ae := []float64{}
-	sc := make([]*big.Int, len(ac))
-	for i, n := range ac {
+	sc := make([]*big.Int, len(ac.Nodes))
+	for i, n := range ac.Nodes {
 		switch n := n.(type) {
 		case VarNode:
 			varNode++
@@ -143,6 +154,21 @@ func (ac AC) Info() (varNode, numNode, mulNode, addNode int, mulEdge, addEdge St
 	mulEdge = analyse(me)
 	addEdge = analyse(ae)
 	return
+}
+
+func X2Ass(xs []int, schema []int) [][]float64 {
+	ass := make([][]float64, len(xs))
+	for i, x := range xs {
+		ass[i] = make([]float64, schema[i])
+		ass[i][x] = 1.0
+	}
+	return ass
+}
+
+func logSumExp(as ...float64) float64 {
+	return logSumExpF(len(as), func(i int) float64 {
+		return as[i]
+	})
 }
 
 func logSumExpF(n int, f func(i int) float64) float64 {

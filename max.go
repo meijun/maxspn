@@ -8,65 +8,61 @@ import (
 	"sync"
 )
 
-type X []int
-
-func X2Assign(x X, stateCnt int) Assign {
-	n := len(x)
-	as := make(Assign, n)
-	for i, xi := range x {
-		as[i] = make([]float64, stateCnt)
-		as[i][xi] = 1
-	}
-	return as
+type XP struct {
+	X []int
+	P float64
 }
 
-func PrbK(spn SPN, k int) (X, float64) {
-	prt := partition(spn)
+func PrbKMax(spn SPN, k int) XP {
+	return MaxXP(PrbK(spn, k))
+}
 
-	xBest, pBest := X{}, math.Inf(-1)
-	for times := 0; times < k; times++ {
-		x := prb1(spn, prt)
-		p := spn.Pr(X2Assign(x, 2))
-		if p > pBest {
-			pBest = p
-			xBest = x
+func MaxXP(xps []XP) XP {
+	max := XP{P: math.Inf(-1)}
+	for _, xp := range xps {
+		if max.P < xp.P {
+			max = xp
 		}
 	}
-	return xBest, pBest
+	return max
+}
+
+func PrbK(spn SPN, k int) []XP {
+	prt := partition(spn)
+	res := make([]XP, k)
+	wg := sync.WaitGroup{}
+	for times := 0; times < k; times++ {
+		wg.Add(1)
+		go func(i int) {
+			x := prb1(spn, prt)
+			p := spn.EvalX(x)
+			res[i] = XP{x, p}
+			wg.Done()
+		}(times)
+	}
+	wg.Wait()
+	return res
 }
 
 func partition(spn SPN) []float64 {
-	prt := make([]float64, len(spn))
-	for i, n := range spn {
-		switch n := n.(type) {
-		case *Trm:
-			prt[i] = 0
-		case *Sum:
-			prt[i] = logSumExpF(len(n.Edges), func(k int) float64 {
-				return n.Edges[k].Weight + prt[n.Edges[k].Node.ID()]
-			})
-		case *Prd:
-			val := 0.0
-			for _, e := range n.Edges {
-				val += prt[e.Node.ID()]
-			}
-			prt[i] = val
+	ass := make([][]float64, len(spn.Schema))
+	for i := range ass {
+		ass[i] = make([]float64, spn.Schema[i])
+		for j := range ass[i] {
+			ass[i][j] = 1
 		}
 	}
-	return prt
+	return spn.Eval(ass)
 }
 
-func prb1(spn SPN, prt []float64) X {
-	x := X{}
-	reach := make([]bool, len(spn))
-	reach[len(spn)-1] = true
-	for i := len(spn) - 1; i >= 0; i-- {
+func prb1(spn SPN, prt []float64) []int {
+	x := make([]int, len(spn.Schema))
+	reach := make([]bool, len(spn.Nodes))
+	reach[len(spn.Nodes)-1] = true
+	for i := len(spn.Nodes) - 1; i >= 0; i-- {
 		if reach[i] {
-			switch n := spn[i].(type) {
+			switch n := spn.Nodes[i].(type) {
 			case *Trm:
-				for len(x) <= n.Kth {
-					x = append(x, 0)
-				}
 				x[n.Kth] = n.Value
 			case *Sum:
 				r := math.Log(rand.Float64()) + prt[i]
@@ -88,21 +84,15 @@ func prb1(spn SPN, prt []float64) X {
 	return x
 }
 
-func logSumExp(as ...float64) float64 {
-	return logSumExpF(len(as), func(i int) float64 {
-		return as[i]
-	})
-}
-
-func MaxMax(spn SPN) X {
-	prt := make([]float64, len(spn))
-	branch := make([]SID, len(spn))
-	for i, n := range spn {
+func MaxMax(spn SPN) []int {
+	prt := make([]float64, len(spn.Nodes))
+	branch := make([]int, len(spn.Nodes))
+	for i, n := range spn.Nodes {
 		switch n := n.(type) {
 		case *Trm:
 			prt[i] = 0
 		case *Sum:
-			eBest, pBest := SID(-1), math.Inf(-1)
+			eBest, pBest := -1, math.Inf(-1)
 			for _, e := range n.Edges {
 				crt := e.Weight + prt[e.Node.ID()]
 				if pBest < crt {
@@ -120,16 +110,13 @@ func MaxMax(spn SPN) X {
 		}
 	}
 
-	x := X{}
-	reach := make([]bool, len(spn))
-	reach[len(spn)-1] = true
-	for i := len(spn) - 1; i >= 0; i-- {
+	x := make([]int, len(spn.Schema))
+	reach := make([]bool, len(spn.Nodes))
+	reach[len(spn.Nodes)-1] = true
+	for i := len(spn.Nodes) - 1; i >= 0; i-- {
 		if reach[i] {
-			switch n := spn[i].(type) {
+			switch n := spn.Nodes[i].(type) {
 			case *Trm:
-				for len(x) <= n.Kth {
-					x = append(x, 0)
-				}
 				x[n.Kth] = n.Value
 			case *Sum:
 				reach[branch[i]] = true
@@ -143,21 +130,18 @@ func MaxMax(spn SPN) X {
 	return x
 }
 
-func SumMax(spn SPN) X {
+func SumMax(spn SPN) []int {
 	prt := partition(spn)
-	x := X{}
-	reach := make([]bool, len(spn))
-	reach[len(spn)-1] = true
-	for i := len(spn) - 1; i >= 0; i-- {
+	x := make([]int, len(spn.Schema))
+	reach := make([]bool, len(spn.Nodes))
+	reach[len(spn.Nodes)-1] = true
+	for i := len(spn.Nodes) - 1; i >= 0; i-- {
 		if reach[i] {
-			switch n := spn[i].(type) {
+			switch n := spn.Nodes[i].(type) {
 			case *Trm:
-				for len(x) <= n.Kth {
-					x = append(x, 0)
-				}
 				x[n.Kth] = n.Value
 			case *Sum:
-				eBest, pBest := SID(-1), math.Inf(-1)
+				eBest, pBest := -1, math.Inf(-1)
 				for _, e := range n.Edges {
 					crt := e.Weight + prt[e.Node.ID()]
 					if pBest < crt {
@@ -176,91 +160,63 @@ func SumMax(spn SPN) X {
 	return x
 }
 
-func NaiveBayes(spn SPN, stateCnt int) X {
-	varCnt := 0
-	for _, n := range spn {
-		if n, ok := n.(*Trm); ok {
-			if n.Kth > varCnt {
-				varCnt = n.Kth
-			}
-		}
-	}
-	varCnt++
-	getAssign := func(k int, s int) Assign {
-		as := make(Assign, varCnt)
-		for i := range as {
-			as[i] = make([]float64, stateCnt)
-			for j := range as[i] {
-				if i == k {
-					if j == s {
-						as[i][j] = 1
-					} else {
-						as[i][j] = 0
-					}
-				} else {
-					as[i][j] = 1
-				}
-			}
-		}
-		return as
-	}
-	x := make(X, varCnt)
-	for i := 0; i < varCnt; i++ {
+func NaiveBayes(spn SPN) []int {
+	xs := make([]int, len(spn.Schema))
+	for i := range xs {
 		sBest, pBest := -1, math.Inf(-1)
-		for j := 0; j < stateCnt; j++ {
-			p := spn.Pr(getAssign(i, j))
+		for j := range xs {
+			ps := spn.Eval(marginalAss1(spn.Schema, i, j))
+			p := ps[len(ps)-1]
 			if pBest < p {
 				pBest = p
 				sBest = j
 			}
 		}
-		x[i] = sBest
+		xs[i] = sBest
 	}
-	return x
+	return xs
 }
 
-type XP struct {
-	X X
-	P float64
+func marginalAss1(schema []int, kth int, val int) [][]float64 {
+	ass := make([][]float64, len(schema))
+	for i := range ass {
+		ass[i] = make([]float64, schema[i])
+		for j := range ass[i] {
+			if i == kth {
+				if j == val {
+					ass[i][j] = 1
+				} else {
+					ass[i][j] = 0
+				}
+			} else {
+				ass[i][j] = 1
+			}
+		}
+	}
+	return ass
 }
 
-func BeamSearch(spn SPN, xps []XP, schema X, beamSize int) XP {
-	xpBest := XP{X{}, math.Inf(-1)}
+func BeamSearch(spn SPN, xps []XP, beamSize int) XP {
+	best := XP{P: math.Inf(-1)}
 	for i := 0; len(xps) > 0; i++ {
-		log.Printf("Round %d, len: %d, pBest %f\n", i, len(xps), xpBest.P)
+		log.Printf("Round %d, len: %d, pBest %f\n", i, len(xps), best.P)
 		xps = uniqueX(xps)
 		xps = topK(xps, beamSize)
 		xp1 := topK(xps, 1)
-		if xpBest.P < xp1[0].P {
-			xpBest = xp1[0]
+		if best.P < xp1[0].P {
+			best = xp1[0]
 		}
-		xps = nextGens(xps, spn, schema)
+		xps = nextGens(xps, spn)
 	}
-	return xpBest
+	return best
 }
 
-func PrbKInit(spn SPN, k int) []XP {
-	prt := partition(spn)
-	res := make([]XP, k)
-	wg := sync.WaitGroup{}
-	for times := 0; times < k; times++ {
-		wg.Add(1)
-		go func(i int) {
-			x := prb1(spn, prt)
-			p := spn.Pr(X2Assign(x, 2))
-			res[i] = XP{x, p}
-			wg.Done()
-		}(times)
-	}
-	wg.Wait()
-	return res
-}
-func nextGens(xps []XP, spn SPN, schema X) []XP {
+func nextGens(xps []XP, spn SPN) []XP {
 	res := []XP{}
 	resChan := make([]chan []XP, len(xps))
 	for i, xp := range xps {
 		ch := make(chan []XP)
-		go nextGenP(xp, spn, schema, ch)
+		go nextGenP(xp, spn, ch)
 		resChan[i] = ch
 	}
 	for _, ch := range resChan {
@@ -268,15 +224,16 @@ func nextGens(xps []XP, spn SPN, schema X) []XP {
 	}
 	return res
 }
-func nextGen(xp XP, spn SPN, schema X, ch chan []XP) {
+
+func nextGen(xp XP, spn SPN, ch chan []XP) {
 	res := []XP{}
-	for i, cnt := range schema {
+	for i, cnt := range spn.Schema {
 		for xi := 0; xi < cnt; xi++ {
 			if xp.X[i] != xi {
-				nx := make(X, len(xp.X))
+				nx := make([]int, len(xp.X))
 				copy(nx, xp.X)
 				nx[i] = xi
-				np := spn.Pr(XSchema2Assign(nx, schema))
+				np := spn.EvalX(nx)
 				if np > xp.P {
 					res = append(res, XP{nx, np})
 				}
@@ -285,27 +242,29 @@ func nextGen(xp XP, spn SPN, schema X, ch chan []XP) {
 	}
 	ch <- res
 }
-func nextGenP(xp XP, spn SPN, schema X, ch chan []XP) {
+
+func nextGenP(xp XP, spn SPN, ch chan []XP) {
 	res := []XP{}
-	chs := make([]chan []XP, len(schema))
-	for i, cnt := range schema {
+	chs := make([]chan []XP, len(spn.Schema))
+	for i, cnt := range spn.Schema {
 		chi := make(chan []XP)
 		chs[i] = chi
-		go genKth(cnt, xp, i, spn, schema, chi)
+		go genKth(cnt, xp, i, spn, chi)
 	}
 	for i := range chs {
 		res = append(res, <-chs[i]...)
 	}
 	ch <- res
 }
-func genKth(cnt int, xp XP, i int, spn SPN, schema X, chi chan []XP) {
+
+func genKth(cnt int, xp XP, i int, spn SPN, chi chan []XP) {
 	r := []XP{}
 	for xi := 0; xi < cnt; xi++ {
 		if xp.X[i] != xi {
-			nx := make(X, len(xp.X))
+			nx := make([]int, len(xp.X))
 			copy(nx, xp.X)
 			nx[i] = xi
-			np := spn.Pr(XSchema2Assign(nx, schema))
+			np := spn.EvalX(nx)
 			if np > xp.P {
 				//res = append(res, XP{nx, np})
 				r = append(r, XP{nx, np})
@@ -314,14 +273,7 @@ func genKth(cnt int, xp XP, i int, spn SPN, schema X, chi chan []XP) {
 	}
 	chi <- r
 }
-func XSchema2Assign(x X, schema X) Assign {
-	as := make(Assign, len(x))
-	for i, xi := range x {
-		as[i] = make([]float64, schema[i])
-		as[i][xi] = 1
-	}
-	return as
-}
+
 func uniqueX(xps []XP) []XP {
 	is := make([]bool, len(xps))
 	res := make([]XP, 0, len(xps))
@@ -339,6 +291,7 @@ func uniqueX(xps []XP) []XP {
 	}
 	return res
 }
+
 func topK(xps []XP, k int) []XP {
 	if k > len(xps) {
 		k = len(xps)
@@ -351,4 +304,52 @@ func topK(xps []XP, k int) []XP {
 		}
 	}
 	return xps[:k]
+}
+
+func Max(spn SPN) float64 {
+	val := make([]float64, len(spn.Nodes))
+	for i, n := range spn.Nodes {
+		switch n := n.(type) {
+		case *Trm:
+			val[i] = 0
+		case *Sum:
+			max := math.Inf(-1)
+			for _, e := range n.Edges {
+				max = math.Max(max, val[e.Node.ID()]+e.Weight)
+			}
+			val[i] = max
+		case *Prd:
+			prd := 0.0
+			for _, e := range n.Edges {
+				prd += val[e.Node.ID()]
+			}
+			val[i] = prd
+		}
+	}
+	return val[len(val)-1]
+}
+
+func Derivative(spn SPN, xs []int) []float64 {
+	pr := spn.Eval(X2Ass(xs, spn.Schema))
+	dr := make([]float64, len(spn.Nodes))
+	dr[len(dr)-1] = 0.0
+	for i := len(spn.Nodes) - 1; i >= 0; i-- {
+		switch n := spn.Nodes[i].(type) {
+		case *Sum:
+			for _, e := range n.Edges {
+				dr[e.Node.ID()] = logSumExp(dr[e.Node.ID()], dr[i]+e.Weight)
+			}
+		case *Prd:
+			for j, e := range n.Edges {
+				other := 0.0
+				for k, e := range n.Edges {
+					if j != k {
+						other += pr[e.Node.ID()]
+					}
+				}
+				dr[e.Node.ID()] = logSumExp(dr[e.Node.ID()], dr[i]+other)
+			}
+		}
+	}
+	return dr
 }

@@ -7,13 +7,14 @@ import (
 )
 
 type Node interface {
-	ID() SID
-	SetID(id SID)
+	ID() int
+	SetID(id int)
 }
 
-type SPN []Node
-
-type SID int
+type SPN struct {
+	Nodes  []Node
+	Schema []int
+}
 
 type SumEdge struct {
 	Weight float64 // in log
@@ -26,31 +27,31 @@ type PrdEdge struct {
 type Trm struct {
 	Kth   int // k-th variable
 	Value int // variable state
-	id    SID
+	id    int
 }
 type Sum struct {
 	Edges []SumEdge
-	id    SID
+	id    int
 }
 type Prd struct {
 	Edges []PrdEdge
-	id    SID
+	id    int
 }
 
-func (t *Trm) ID() SID      { return t.id }
-func (t *Trm) SetID(id SID) { t.id = id }
-func (s *Sum) ID() SID      { return s.id }
-func (s *Sum) SetID(id SID) { s.id = id }
-func (p *Prd) ID() SID      { return p.id }
-func (p *Prd) SetID(id SID) { p.id = id }
+func (t *Trm) ID() int      { return t.id }
+func (t *Trm) SetID(id int) { t.id = id }
+func (s *Sum) ID() int      { return s.id }
+func (s *Sum) SetID(id int) { s.id = id }
+func (p *Prd) ID() int      { return p.id }
+func (p *Prd) SetID(id int) { p.id = id }
 
 // By ID-SPN
 func AC2SPN(ac AC) SPN {
-	nn := len(ac)
+	nn := len(ac.Nodes)
 	ns := make([]Node, nn)
 	we := make([]float64, nn)
 	zs := make([]bool, nn) // zero scope
-	for i, n := range ac {
+	for i, n := range ac.Nodes {
 		switch n := n.(type) {
 		case VarNode:
 			ns[i] = &Trm{
@@ -70,7 +71,7 @@ func AC2SPN(ac AC) SPN {
 					// if _, ok := ac[ci].(NumNode); !ok {
 					prd.Edges = append(prd.Edges, PrdEdge{ns[ci]})
 				}
-				if _, ok := ac[ci].(AddNode); !ok {
+				if _, ok := ac.Nodes[ci].(AddNode); !ok {
 					w += we[ci]
 				}
 			}
@@ -82,7 +83,7 @@ func AC2SPN(ac AC) SPN {
 		case AddNode:
 			sum := &Sum{Edges: make([]SumEdge, 0, len(n))}
 			for _, ci := range n {
-				if _, ok := ac[ci].(NumNode); !ok {
+				if _, ok := ac.Nodes[ci].(NumNode); !ok {
 					sum.Edges = append(sum.Edges, SumEdge{we[ci], ns[ci]})
 				}
 			}
@@ -90,39 +91,44 @@ func AC2SPN(ac AC) SPN {
 			zs[i] = false
 		}
 	}
-	if _, ok := ac[nn-1].(AddNode); !ok {
+	if _, ok := ac.Nodes[nn-1].(AddNode); !ok {
 		ns = append(ns, &Sum{Edges: []SumEdge{{we[nn-1], ns[nn-1]}}})
 	}
-	spn := make(SPN, 0, nn)
+	nodes := make([]Node, 0, nn)
 	for _, n := range ns {
 		if n != nil {
-			n.SetID(SID(len(spn)))
-			spn = append(spn, n)
+			n.SetID(int(len(nodes)))
+			nodes = append(nodes, n)
 		}
 	}
-	return spn
+	return SPN{nodes, ac.Schema}
 }
 
-// Return log(Pr(x))
-func (spn SPN) Pr(assign Assign) float64 {
-	pr := make([]float64, len(spn))
-	for _, n := range spn {
+// Return log(Eval(x))
+func (spn SPN) EvalX(xs []int) float64 {
+	val := spn.Eval(X2Ass(xs, spn.Schema))
+	return val[len(val)-1]
+}
+
+func (spn SPN) Eval(ass [][]float64) []float64 {
+	val := make([]float64, len(spn.Nodes))
+	for _, n := range spn.Nodes {
 		switch n := n.(type) {
 		case *Trm:
-			pr[n.ID()] = math.Log(assign[n.Kth][n.Value])
+			val[n.ID()] = math.Log(ass[n.Kth][n.Value])
 		case *Sum:
-			pr[n.ID()] = logSumExpF(len(n.Edges), func(k int) float64 {
-				return n.Edges[k].Weight + pr[n.Edges[k].Node.ID()]
+			val[n.ID()] = logSumExpF(len(n.Edges), func(k int) float64 {
+				return n.Edges[k].Weight + val[n.Edges[k].Node.ID()]
 			})
 		case *Prd:
-			val := 0.0
+			prd := 0.0
 			for _, e := range n.Edges {
-				val += pr[e.Node.ID()]
+				prd += val[e.Node.ID()]
 			}
-			pr[n.ID()] = val
+			val[n.ID()] = prd
 		}
 	}
-	return pr[spn[len(spn)-1].ID()]
+	return val
 }
 
 type Stat struct {
@@ -136,7 +142,7 @@ type Stat struct {
 func (spn SPN) Info() (trmNode, sumNode, prdNode int, sumEdge, prdEdge Stat) {
 	se := []float64{}
 	pe := []float64{}
-	for _, n := range spn {
+	for _, n := range spn.Nodes {
 		switch n := n.(type) {
 		case *Trm:
 			trmNode++
@@ -152,6 +158,7 @@ func (spn SPN) Info() (trmNode, sumNode, prdNode int, sumEdge, prdEdge Stat) {
 	prdEdge = analyse(pe)
 	return
 }
+
 func analyse(xs []float64) Stat {
 	SumX := 0.0
 	SumX2 := 0.0
@@ -175,74 +182,106 @@ func analyse(xs []float64) Stat {
 	}
 }
 
-func (spn SPN) SaveAsAC(name string) {
-	ac := []byte{}
-	id := make([]int, len(spn))
+func (spn SPN) SaveAsAC(filename string) {
+	data := make([]byte, 0, len(spn.Nodes))
+	data = formatSchema(data, spn.Schema)
+	id := make([]int, len(spn.Nodes))
 	crt := 0
-	sc := []int{}
-	for i, n := range spn {
+	for i, n := range spn.Nodes {
 		switch n := n.(type) {
 		case *Trm:
-			for len(sc) <= n.Kth {
-				sc = append(sc, 0)
-			}
-			if sc[n.Kth] < n.Value {
-				sc[n.Kth] = n.Value
-			}
-			ac = append(ac, 'v')
-			ac = append(ac, ' ')
-			ac = strconv.AppendInt(ac, int64(n.Kth), 10)
-			ac = append(ac, ' ')
-			ac = strconv.AppendInt(ac, int64(n.Value), 10)
-			ac = append(ac, '\n')
+			data = append(data, 'v')
+			data = append(data, ' ')
+			data = strconv.AppendInt(data, int64(n.Kth), 10)
+			data = append(data, ' ')
+			data = strconv.AppendInt(data, int64(n.Value), 10)
+			data = append(data, '\n')
 			id[i] = crt
 			crt++
 		case *Sum:
 			sid := make([]int, len(n.Edges))
 			for j, e := range n.Edges {
 				// new number node
-				ac = append(ac, 'n')
-				ac = append(ac, ' ')
-				ac = strconv.AppendFloat(ac, math.Exp(e.Weight), 'f', -1, 64)
-				ac = append(ac, '\n')
+				data = append(data, 'n')
+				data = append(data, ' ')
+				data = strconv.AppendFloat(data, math.Exp(e.Weight), 'f', -1, 64)
+				data = append(data, '\n')
 				crt++
 				// new mul node
-				ac = append(ac, '*')
-				ac = append(ac, ' ')
-				ac = strconv.AppendInt(ac, int64(crt)-1, 10)
-				ac = append(ac, ' ')
-				ac = strconv.AppendInt(ac, int64(id[e.Node.ID()]), 10)
-				ac = append(ac, '\n')
+				data = append(data, '*')
+				data = append(data, ' ')
+				data = strconv.AppendInt(data, int64(crt)-1, 10)
+				data = append(data, ' ')
+				data = strconv.AppendInt(data, int64(id[e.Node.ID()]), 10)
+				data = append(data, '\n')
 				sid[j] = crt
 				crt++
 			}
-			ac = append(ac, '+')
+			data = append(data, '+')
 			for j := range n.Edges {
-				ac = append(ac, ' ')
-				ac = strconv.AppendInt(ac, int64(sid[j]), 10)
+				data = append(data, ' ')
+				data = strconv.AppendInt(data, int64(sid[j]), 10)
 			}
-			ac = append(ac, '\n')
+			data = append(data, '\n')
 			id[i] = crt
 			crt++
 		case *Prd:
-			ac = append(ac, '*')
+			data = append(data, '*')
 			for _, e := range n.Edges {
-				ac = append(ac, ' ')
-				ac = strconv.AppendInt(ac, int64(id[e.Node.ID()]), 10)
+				data = append(data, ' ')
+				data = strconv.AppendInt(data, int64(id[e.Node.ID()]), 10)
 			}
-			ac = append(ac, '\n')
+			data = append(data, '\n')
 			id[i] = crt
 			crt++
 		}
 	}
-	bs := make([]byte, 0, len(ac))
-	for _, n := range sc {
-		bs = append(bs, ' ')
-		bs = strconv.AppendInt(bs, int64(n)+1, 10)
+	data = append(data, []byte("EOF\n")...)
+	ioutil.WriteFile(filename, data, 0666)
+}
+
+func (spn SPN) Save(filename string) {
+	data := make([]byte, 0, len(spn.Nodes))
+	data = formatSchema(data, spn.Schema)
+	for _, n := range spn.Nodes {
+		switch n := n.(type) {
+		case *Trm:
+			data = append(data, 'v')
+			data = append(data, ' ')
+			data = strconv.AppendInt(data, int64(n.Kth), 10)
+			data = append(data, ' ')
+			data = strconv.AppendInt(data, int64(n.Value), 10)
+			data = append(data, '\n')
+		case *Sum:
+			data = append(data, '+')
+			for _, e := range n.Edges {
+				data = append(data, ' ')
+				data = strconv.AppendInt(data, int64(e.Node.ID()), 10)
+				data = append(data, ' ')
+				data = strconv.AppendFloat(data, e.Weight, 'f', -1, 64)
+			}
+			data = append(data, '\n')
+		case *Prd:
+			data = append(data, '*')
+			for _, e := range n.Edges {
+				data = append(data, ' ')
+				data = strconv.AppendInt(data, int64(e.Node.ID()), 10)
+			}
+			data = append(data, '\n')
+		}
 	}
-	bs[0] = '('
-	bs = append(bs, ')', '\n')
-	bs = append(bs, ac...)
-	bs = append(bs, []byte("EOF\n")...)
-	ioutil.WriteFile(name, bs, 0666)
+	data = append(data, []byte("EOF\n")...)
+	ioutil.WriteFile(filename, data, 0666)
+}
+
+func formatSchema(data []byte, schema []int) []byte {
+	data = append(data, '(')
+	for i := 0; i < len(schema); i++ {
+		if i != 0 {
+			data = append(data, ' ')
+		}
+		data = strconv.AppendInt(data, int64(schema[i]), 10)
+	}
+	data = append(data, ')', '\n')
+	return data
 }
