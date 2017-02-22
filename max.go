@@ -332,6 +332,9 @@ func Max(spn SPN) float64 {
 func Derivative(spn SPN, xs []int) []float64 {
 	pr := spn.Eval(X2Ass(xs, spn.Schema))
 	dr := make([]float64, len(spn.Nodes))
+	for i := range dr {
+		dr[i] = math.Inf(-1)
+	}
 	dr[len(dr)-1] = 0.0
 	for i := len(spn.Nodes) - 1; i >= 0; i-- {
 		switch n := spn.Nodes[i].(type) {

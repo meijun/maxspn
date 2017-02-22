@@ -106,3 +106,15 @@ func Exp() {
 		log.Println(res)
 	}
 }
+
+func ACMaxMaxExp() {
+	ps := make([]float64, len(DataNames))
+	for i, name := range DataNames {
+		ac := LoadAC("data/" + name + ".ac")
+		x := ac.MaxMax()
+		p := AC2SPN(ac).EvalX(x)
+		log.Println(x, p)
+		ps[i] = p
+	}
+	log.Println(ps)
+}

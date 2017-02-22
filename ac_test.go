@@ -60,6 +60,31 @@ func TestAC_EvalX(t *testing.T) {
 	}
 }
 
+func TestAC_MaxMax(t *testing.T) {
+	ac := LoadAC("data/nltcs.ac")
+	x := ac.MaxMax()
+	p := AC2SPN(ac).EvalX(x)
+	t.Log(x, p)
+}
+
+func TestAC_Derivative(t *testing.T) {
+	ac := LoadAC("data/nltcs.ac")
+	x := make([]int, len(ac.Schema))
+	dr := ac.Derivative(x)
+	for i := range ac.Nodes {
+		if n, ok := ac.Nodes[i].(VarNode); ok {
+			nx := make([]int, len(x))
+			copy(nx, x)
+			nx[n.Kth] = n.Value
+			np := ac.EvalX(nx)
+			//t.Logf("%d %d: %f %f %f\n", n.Kth, n.Value, dr[i], np, math.Abs(dr[i]-np))
+			if math.Abs(dr[i]-np) > 1e-6 {
+				t.Errorf("%d %d: %f %f %f\n", n.Kth, n.Value, dr[i], np, math.Abs(dr[i]-np))
+			}
+		}
+	}
+}
+
 func TestAC_Info(t *testing.T) {
 	//for _, name := range DataNames {
 	//	t.Log(LoadAC("data/" + name + ".ac").Info())

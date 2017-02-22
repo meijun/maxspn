@@ -156,6 +156,83 @@ func (ac AC) Info() (varNode, numNode, mulNode, addNode int, mulEdge, addEdge St
 	return
 }
 
+func (ac AC) MaxMax() []int {
+	val := make([]float64, len(ac.Nodes))
+	win := make([]int, len(ac.Nodes))
+	for i, n := range ac.Nodes {
+		switch n := n.(type) {
+		case VarNode:
+			val[i] = 0
+		case NumNode:
+			val[i] = math.Log(float64(n))
+		case MulNode:
+			mul := 0.0
+			for _, c := range n {
+				mul += val[c]
+			}
+			val[i] = mul
+		case AddNode:
+			max := math.Inf(-1)
+			winC := -1
+			for _, c := range n {
+				if max < val[c] {
+					max = val[c]
+					winC = c
+				}
+			}
+			val[i] = max
+			win[i] = winC
+		}
+	}
+	xs := make([]int, len(ac.Schema))
+	reach := make([]bool, len(ac.Nodes))
+	reach[len(ac.Nodes)-1] = true
+	for i := len(ac.Nodes) - 1; i >= 0; i-- {
+		if reach[i] {
+			switch n := ac.Nodes[i].(type) {
+			case VarNode:
+				xs[n.Kth] = n.Value
+			case NumNode:
+			case MulNode:
+				for _, c := range n {
+					reach[c] = true
+				}
+			case AddNode:
+				reach[win[i]] = true
+			}
+		}
+	}
+	return xs
+}
+
+func (ac AC) Derivative(xs []int) []float64 {
+	pr := ac.Eval(X2Ass(xs, ac.Schema))
+	dr := make([]float64, len(ac.Nodes))
+	for i := range dr {
+		dr[i] = math.Inf(-1)
+	}
+	dr[len(dr)-1] = 0.0
+	for i := len(ac.Nodes) - 1; i >= 0; i-- {
+		switch n := ac.Nodes[i].(type) {
+		case MulNode:
+			for j, ej := range n {
+				other := 0.0
+				for k, ek := range n {
+					if j != k {
+						other += pr[ek]
+					}
+				}
+				dr[ej] = logSumExp(dr[ej], dr[i]+other)
+			}
+		case AddNode:
+			for _, e := range n {
+				dr[e] = logSumExp(dr[e], dr[i])
+			}
+		}
+	}
+	return dr
+}
+
 func X2Ass(xs []int, schema []int) [][]float64 {
 	ass := make([][]float64, len(xs))
 	for i, x := range xs {
@@ -175,6 +252,9 @@ func logSumExpF(n int, f func(i int) float64) float64 {
 	max := math.Inf(-1)
 	for i := 0; i < n; i++ {
 		max = math.Max(max, f(i))
+	}
+	if math.IsInf(max, 0) {
+		return max
 	}
 	sum := 0.0
 	for i := 0; i < n; i++ {

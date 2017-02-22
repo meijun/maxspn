@@ -55,7 +55,10 @@ func TestDerivative(t *testing.T) {
 			copy(nx, x)
 			nx[n.Kth] = n.Value
 			np := spn.EvalX(nx)
-			t.Logf("%d %d: %f %f %f\n", n.Kth, n.Value, dr[i], np, math.Abs(dr[i]-np))
+			//t.Logf("%d %d: %f %f %f\n", n.Kth, n.Value, dr[i], np, math.Abs(dr[i]-np))
+			if math.Abs(dr[i]-np) > 1e-6 {
+				t.Errorf("%d %d: %f %f %f\n", n.Kth, n.Value, dr[i], np, math.Abs(dr[i]-np))
+			}
 		}
 	}
 }
