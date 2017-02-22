@@ -164,7 +164,7 @@ func NaiveBayes(spn SPN) []int {
 	xs := make([]int, len(spn.Schema))
 	for i := range xs {
 		sBest, pBest := -1, math.Inf(-1)
-		for j := range xs {
+		for j := 0; j < xs[i]; j++ {
 			ps := spn.Eval(marginalAss1(spn.Schema, i, j))
 			p := ps[len(ps)-1]
 			if pBest < p {
