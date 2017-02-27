@@ -54,3 +54,9 @@ func TestSPN_Info(t *testing.T) {
 func TestSPN_SaveAsAC(t *testing.T) {
 	AC2SPN(LoadAC("data/nltcs.ac")).SaveAsAC("data/nltcs.ac2")
 }
+
+func TestLoadSPN(t *testing.T) {
+	spn := LoadSPN("data/spn.spn")
+	t.Log(spn.Info())
+	spn.Save("data/spn2.spn")
+}

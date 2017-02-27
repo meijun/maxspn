@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"io/ioutil"
+	"log"
 	"math"
 	"strconv"
 )
@@ -272,6 +274,64 @@ func (spn SPN) Save(filename string) {
 	}
 	data = append(data, []byte("EOF\n")...)
 	ioutil.WriteFile(filename, data, 0666)
+}
+
+func LoadSPN(filename string) SPN {
+	bs, err := ioutil.ReadFile(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	bss := bytes.Split(bs, []byte("\n"))
+	end := len(bss) - 1
+	for string(bss[end]) != "EOF" {
+		end--
+	}
+
+	scs := bytes.Split(bss[0][1:len(bss[0])-1], []byte(" "))
+	schema := make([]int, len(scs))
+	for i, s := range scs {
+		schema[i] = parseInt(string(s))
+	}
+
+	bss = bss[1:end]
+	nodes := make([]Node, len(bss))
+	for i, ln := range bss {
+		bs := bytes.Split(ln, []byte(" "))
+		switch string(bs[0]) {
+		case "v":
+			nodes[i] = &Trm{
+				Kth:   parseInt(string(bs[1])),
+				Value: parseInt(string(bs[2])),
+				id:    i,
+			}
+		case "+":
+			es := make([]SumEdge, len(bs)/2)
+			for j := 1; j < len(bs); j += 2 {
+				node := nodes[parseInt(string(bs[j]))]
+				weight := parseFloat(string(bs[j+1]))
+				es[j/2] = SumEdge{
+					Weight: weight,
+					Node:   node,
+				}
+			}
+			nodes[i] = &Sum{
+				Edges: es,
+				id:    i,
+			}
+		case "*":
+			es := make([]PrdEdge, len(bs)-1)
+			for j, v := range bs[1:] {
+				es[j] = PrdEdge{
+					Node: nodes[parseInt(string(v))],
+				}
+			}
+			nodes[i] = &Prd{
+				Edges: es,
+				id:    i,
+			}
+		}
+	}
+	return SPN{nodes, schema}
 }
 
 func formatSchema(data []byte, schema []int) []byte {
