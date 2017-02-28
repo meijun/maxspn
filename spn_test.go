@@ -7,12 +7,12 @@ import (
 )
 
 func TestAC2SPN(t *testing.T) {
-	ac := LoadAC("data/nltcs.ac")
+	ac := LoadAC("data/idspac/nltcs.ac")
 	AC2SPN(ac)
 }
 
 func TestSPN_Pr(t *testing.T) {
-	ac := LoadAC("data/nltcs.ac")
+	ac := LoadAC("data/idspac/nltcs.ac")
 	spn := AC2SPN(ac)
 	p0 := spn.EvalX([]int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
 	if math.Abs(p0-(-1.750023)) > 1e-6 {
@@ -48,11 +48,11 @@ func TestSPN_Info(t *testing.T) {
 	//for _, name := range DataNames {
 	//	t.Log(AC2SPN(LoadAC("data/"+name+".ac")).Info())
 	//}
-	t.Log(AC2SPN(LoadAC("data/nltcs.ac")).Info())
+	t.Log(AC2SPN(LoadAC("data/idspac/nltcs.ac")).Info())
 }
 
 func TestSPN_SaveAsAC(t *testing.T) {
-	AC2SPN(LoadAC("data/nltcs.ac")).SaveAsAC("data/nltcs.ac2")
+	AC2SPN(LoadAC("data/idspac/nltcs.ac")).SaveAsAC("data/nltcs.ac2")
 }
 
 func TestLoadSPN(t *testing.T) {

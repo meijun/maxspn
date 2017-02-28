@@ -32,7 +32,7 @@ func testLoadAC_dfs(cnt []int, ac AC, v int, vis []bool) {
 }
 
 func TestLoadAC(t *testing.T) {
-	ac := LoadAC("data/nltcs.ac")
+	ac := LoadAC("data/idspac/nltcs.ac")
 	cnt := []int{0, 0, 0, 0, 0}
 	testLoadAC_dfs(cnt, ac, len(ac.Nodes)-1, make([]bool, len(ac.Nodes)))
 	if !reflect.DeepEqual(cnt, []int{32, 2625, 288155, 100776, 878825}) {
@@ -41,7 +41,7 @@ func TestLoadAC(t *testing.T) {
 }
 
 func TestAC_EvalX(t *testing.T) {
-	ac := LoadAC("data/nltcs.ac")
+	ac := LoadAC("data/idspac/nltcs.ac")
 	p0 := ac.EvalX([]int{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
 	if math.Abs(p0-(-1.750023)) > 1e-6 {
 		t.Fail() // from `libra acquery -m nltcs.ac -q nltcs0.q`
@@ -61,14 +61,14 @@ func TestAC_EvalX(t *testing.T) {
 }
 
 func TestAC_MaxMax(t *testing.T) {
-	ac := LoadAC("data/nltcs.ac")
+	ac := LoadAC("data/idspac/nltcs.ac")
 	x := ac.MaxMax()
 	p := AC2SPN(ac).EvalX(x)
 	t.Log(x, p)
 }
 
 func TestAC_Derivative(t *testing.T) {
-	ac := LoadAC("data/nltcs.ac")
+	ac := LoadAC("data/idspac/nltcs.ac")
 	x := make([]int, len(ac.Schema))
 	dr := ac.Derivative(x)
 	for i := range ac.Nodes {
@@ -89,5 +89,5 @@ func TestAC_Info(t *testing.T) {
 	//for _, name := range DataNames {
 	//	t.Log(LoadAC("data/" + name + ".ac").Info())
 	//}
-	t.Log(LoadAC("data/nltcs.ac").Info())
+	t.Log(LoadAC("data/idspac/nltcs.ac").Info())
 }

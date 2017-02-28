@@ -6,7 +6,7 @@ import (
 )
 
 func TestPrbK(t *testing.T) {
-	spn := AC2SPN(LoadAC("data/nltcs.ac"))
+	spn := AC2SPN(LoadAC("data/idspac/nltcs.ac"))
 	t.Log(PrbKMax(spn, 1))
 	t.Log(PrbKMax(spn, 1))
 	t.Log(PrbKMax(spn, 1))
@@ -17,36 +17,36 @@ func TestPrbK(t *testing.T) {
 }
 
 func TestMaxMax(t *testing.T) {
-	spn := AC2SPN(LoadAC("data/nltcs.ac"))
+	spn := AC2SPN(LoadAC("data/idspac/nltcs.ac"))
 	x := MaxMax(spn)
 	t.Log(x, spn.EvalX(x))
 }
 
 func TestSumMax(t *testing.T) {
-	spn := AC2SPN(LoadAC("data/nltcs.ac"))
+	spn := AC2SPN(LoadAC("data/idspac/nltcs.ac"))
 	x := SumMax(spn)
 	t.Log(x, spn.EvalX(x))
 }
 
 func TestNaiveBayes(t *testing.T) {
-	spn := AC2SPN(LoadAC("data/nltcs.ac"))
+	spn := AC2SPN(LoadAC("data/idspac/nltcs.ac"))
 	x := NaiveBayes(spn)
 	t.Log(x, spn.EvalX(x))
 }
 
 func TestBeamSearch(t *testing.T) {
-	spn := AC2SPN(LoadAC("data/nltcs.ac"))
+	spn := AC2SPN(LoadAC("data/idspac/nltcs.ac"))
 	t.Log(BeamSearch(spn, PrbK(spn, 100), 16))
 }
 
 func TestMax(t *testing.T) {
-	spn := AC2SPN(LoadAC("data/nltcs.ac"))
+	spn := AC2SPN(LoadAC("data/idspac/nltcs.ac"))
 	t.Log(Max(spn))
 	t.Log(partition(spn)[len(spn.Nodes)-1])
 }
 
 func TestDerivative(t *testing.T) {
-	spn := AC2SPN(LoadAC("data/nltcs.ac"))
+	spn := AC2SPN(LoadAC("data/idspac/nltcs.ac"))
 	x := make([]int, len(spn.Schema))
 	dr := Derivative(spn, x)
 	for i := range spn.Nodes {
