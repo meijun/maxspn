@@ -11,5 +11,5 @@ func init() {
 }
 
 func main() {
-
+	Exp(LR_SPN, Prb1kBSMethod)
 }

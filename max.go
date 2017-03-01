@@ -217,7 +217,7 @@ func nextGens(xps []XP, spn SPN) []XP {
 	resChan := make([]chan []XP, len(xps))
 	for i, xp := range xps {
 		ch := make(chan []XP)
-		go nextGenP(xp, spn, ch)
+		go nextGenD(xp, spn, ch)
 		resChan[i] = ch
 	}
 	for _, ch := range resChan {
@@ -254,6 +254,22 @@ func nextGenP(xp XP, spn SPN, ch chan []XP) {
 	}
 	for i := range chs {
 		res = append(res, <-chs[i]...)
+	}
+	ch <- res
+}
+
+func nextGenD(xp XP, spn SPN, ch chan []XP) {
+	res := []XP{}
+	ds := Derivative(spn, xp.X)
+	for i, n := range spn.Nodes {
+		if n, ok := n.(*Trm); ok {
+			if xp.X[n.Kth] != n.Value && ds[i] > xp.P {
+				nx := make([]int, len(xp.X))
+				copy(nx, xp.X)
+				nx[n.Kth] = n.Value
+				res = append(res, XP{nx, ds[i]})
+			}
+		}
 	}
 	ch <- res
 }
