@@ -175,7 +175,7 @@ func (ac AC) MaxMax() []int {
 			max := math.Inf(-1)
 			winC := -1
 			for _, c := range n {
-				if max < val[c] {
+				if max <= val[c] {
 					max = val[c]
 					winC = c
 				}

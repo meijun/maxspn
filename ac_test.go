@@ -86,7 +86,7 @@ func TestAC_Derivative(t *testing.T) {
 }
 
 func TestAC_Info(t *testing.T) {
-	//for _, name := range DataNames {
+	//for _, name := range DATA_NAMES {
 	//	t.Log(LoadAC("data/" + name + ".ac").Info())
 	//}
 	t.Log(LoadAC("data/idspac/nltcs.ac").Info())

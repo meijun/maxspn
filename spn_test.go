@@ -45,7 +45,7 @@ func TestSPN_Pr(t *testing.T) {
 }
 
 func TestSPN_Info(t *testing.T) {
-	//for _, name := range DataNames {
+	//for _, name := range DATA_NAMES {
 	//	t.Log(AC2SPN(LoadAC("data/"+name+".ac")).Info())
 	//}
 	t.Log(AC2SPN(LoadAC("data/idspac/nltcs.ac")).Info())

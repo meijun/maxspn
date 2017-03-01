@@ -101,6 +101,7 @@ func MaxMax(spn SPN) []int {
 				}
 			}
 			branch[i] = eBest
+			prt[i] = pBest
 		case *Prd:
 			val := 0.0
 			for _, e := range n.Edges {
@@ -199,7 +200,7 @@ func marginalAss1(schema []int, kth int, val int) [][]float64 {
 func BeamSearch(spn SPN, xps []XP, beamSize int) XP {
 	best := XP{P: math.Inf(-1)}
 	for i := 0; len(xps) > 0; i++ {
-		log.Printf("Round %d, len: %d, pBest %f\n", i, len(xps), best.P)
+		log.Printf("[BeamSearch] Round %d, len: %d, pBest %f\n", i, len(xps), best.P)
 		xps = uniqueX(xps)
 		xps = topK(xps, beamSize)
 		xp1 := topK(xps, 1)

@@ -107,8 +107,8 @@ func AC2SPN(ac AC) SPN {
 }
 
 // Return log(Eval(x))
-func (spn SPN) EvalX(xs []int) float64 {
-	val := spn.Eval(X2Ass(xs, spn.Schema))
+func (spn SPN) EvalX(x []int) float64 {
+	val := spn.Eval(X2Ass(x, spn.Schema))
 	return val[len(val)-1]
 }
 
