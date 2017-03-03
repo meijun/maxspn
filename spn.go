@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math"
+	"os"
 	"strconv"
 )
 
@@ -344,4 +346,75 @@ func formatSchema(data []byte, schema []int) []byte {
 	}
 	data = append(data, ')', '\n')
 	return data
+}
+
+func (spn SPN) Plot(filename string, treeDepth int) {
+	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
+	if err != nil {
+		log.Fatalf("Open file error: %v\n", err)
+	}
+	defer file.Close()
+	dep := make([]int, len(spn.Nodes))
+	for i, n := range spn.Nodes {
+		switch n := n.(type) {
+		case *Trm:
+			dep[i] = 0
+		case *Sum:
+			dep[i] = len(spn.Nodes)
+			for _, e := range n.Edges {
+				if dep[i] > dep[e.Node.ID()] {
+					dep[i] = dep[e.Node.ID()]
+				}
+			}
+			dep[i]++
+		case *Prd:
+			dep[i] = len(spn.Nodes)
+			for _, e := range n.Edges {
+				if dep[i] > dep[e.Node.ID()] {
+					dep[i] = dep[e.Node.ID()]
+				}
+			}
+			dep[i]++
+		}
+	}
+	fmt.Fprintln(file, "graph{")
+	fmt.Fprintln(file, `rankdir="LR"`)
+	plotDFS(spn.Nodes[len(spn.Nodes)-1], "n", map[int]struct{}{}, dep, treeDepth, file)
+	fmt.Fprintln(file, "}")
+}
+
+func plotDFS(n Node, from string, vis map[int]struct{}, dep []int, treeDepth int, file *os.File) string {
+	var nid string
+	if dep[n.ID()] > treeDepth { // DAG
+		nid = fmt.Sprintf("n%d", n.ID())
+		if _, ok := vis[n.ID()]; ok {
+			return nid
+		}
+		vis[n.ID()] = struct{}{}
+	} else { // Tree
+		nid = fmt.Sprintf("%sn%d", from, n.ID())
+	}
+	var color string
+	switch n := n.(type) {
+	case *Trm:
+		if n.Value == 0 {
+			color = "red"
+		} else {
+			color = "green"
+		}
+	case *Sum:
+		color = "blue"
+		for _, e := range n.Edges {
+			cid := plotDFS(e.Node, nid, vis, dep, treeDepth, file)
+			fmt.Fprintf(file, "%s--%s[color=grey]\n", nid, cid)
+		}
+	case *Prd:
+		color = "grey"
+		for _, e := range n.Edges {
+			cid := plotDFS(e.Node, nid, vis, dep, treeDepth, file)
+			fmt.Fprintf(file, "%s--%s[color=grey]\n", nid, cid)
+		}
+	}
+	fmt.Fprintf(file, "%s[color=%s][shape=point]\n", nid, color)
+	return nid
 }

@@ -3,11 +3,12 @@ package main
 import (
 	"math"
 	"math/rand"
+	"os/exec"
 	"testing"
 )
 
 func TestAC2SPN(t *testing.T) {
-	ac := LoadAC("data/idspac/nltcs.ac")
+	ac := LoadAC(ID_AC + "nltcs")
 	AC2SPN(ac)
 }
 
@@ -48,7 +49,7 @@ func TestSPN_Info(t *testing.T) {
 	//for _, name := range DATA_NAMES {
 	//	t.Log(AC2SPN(LoadAC("data/"+name+".ac")).Info())
 	//}
-	t.Log(AC2SPN(LoadAC("data/idspac/nltcs.ac")).Info())
+	t.Log(LoadSPN(ID_AC_SPN + "nltcs").Info())
 }
 
 func TestSPN_SaveAsAC(t *testing.T) {
@@ -59,4 +60,16 @@ func TestLoadSPN(t *testing.T) {
 	spn := LoadSPN("data/spn.spn")
 	t.Log(spn.Info())
 	spn.Save("data/spn2.spn")
+}
+
+func TestSPN_Plot(t *testing.T) {
+	pr := func(name string) {
+		spn := LoadSPN(name)
+		spn.Plot(name+".dot", 0)
+		exec.Command("dot", "-Tpng", "-O", name+".dot").Run()
+	}
+	pr(TY_SPN + "0")
+	pr(TY_SPN + "1")
+	pr(TY_SPN + "2")
+	pr(TY_SPN + "3")
 }
