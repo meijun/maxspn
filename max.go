@@ -1,6 +1,7 @@
 package main
 
 import (
+	"container/heap"
 	"log"
 	"math"
 	"math/rand"
@@ -25,6 +26,21 @@ func MaxXP(xps []XP) XP {
 		}
 	}
 	return max
+}
+
+func EvalXBatch(spn SPN, xs [][]int) []XP {
+	xps := make([]XP, len(xs))
+	wg := sync.WaitGroup{}
+	for i, x := range xs {
+		wg.Add(1)
+		i, x := i, x
+		go func() {
+			xps[i] = XP{x, spn.EvalX(x)}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	return xps
 }
 
 func PrbK(spn SPN, k int) []XP {
@@ -372,4 +388,125 @@ func Derivative(spn SPN, xs []int) []float64 {
 		}
 	}
 	return dr
+}
+
+type Link struct {
+	P     float64
+	Left  *Link
+	Right *Link
+	Trm   *Trm
+}
+
+func TopKMaxMax(spn SPN, k int) [][]int {
+	ls := make([][]*Link, len(spn.Nodes))
+	for i, n := range spn.Nodes {
+		switch n := n.(type) {
+		case *Trm:
+			ls[i] = []*Link{{P: 0, Trm: n}}
+		case *Sum:
+			for _, e := range n.Edges {
+				ls[i] = mergeSumLink(ls[i], ls[e.Node.ID()], 0, e.Weight, k)
+			}
+		case *Prd:
+			for _, e := range n.Edges {
+				ls[i] = mergePrdLink(ls[i], ls[e.Node.ID()], k)
+			}
+		}
+	}
+	if k > len(ls[len(spn.Nodes)-1]) {
+		k = len(ls[len(spn.Nodes)-1])
+	}
+	xs := make([][]int, k)
+	for i := range xs {
+		xs[i] = make([]int, len(spn.Schema))
+		topKMaxMaxDFS(ls[len(spn.Nodes)-1][i], xs[i])
+	}
+	return xs
+}
+func topKMaxMaxDFS(link *Link, x []int) {
+	if link.Trm != nil {
+		x[link.Trm.Kth] = link.Trm.Value
+	}
+	if link.Left != nil {
+		topKMaxMaxDFS(link.Left, x)
+	}
+	if link.Right != nil {
+		topKMaxMaxDFS(link.Right, x)
+	}
+}
+
+type PairInt struct {
+	Left  int
+	Right int
+}
+type PairLink struct {
+	P float64
+	PairInt
+}
+type PairHeap []PairLink
+
+func (h PairHeap) Len() int           { return len(h) }
+func (h PairHeap) Less(i, j int) bool { return h[i].P > /* MaxHeap */ h[j].P }
+func (h PairHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (h *PairHeap) Push(x interface{}) {
+	*h = append(*h, x.(PairLink))
+}
+func (h *PairHeap) Pop() interface{} {
+	n := len(*h)
+	r := (*h)[n-1]
+	*h = (*h)[0 : n-1]
+	return r
+}
+func mergePrdLink(left, right []*Link, k int) []*Link {
+	if len(left) == 0 {
+		return right
+	}
+	if len(right) == 0 {
+		return left
+	}
+
+	rs := []*Link{}
+	fringe := &PairHeap{}
+	heap.Init(fringe)
+	set := map[PairInt]struct{}{}
+
+	initPair := PairLink{left[0].P + right[0].P, PairInt{0, 0}}
+	heap.Push(fringe, initPair)
+	set[initPair.PairInt] = struct{}{}
+
+	for len(rs) < k && fringe.Len() > 0 {
+		p := heap.Pop(fringe).(PairLink)
+		rs = append(rs, &Link{p.P, left[p.Left], right[p.Right], nil})
+		if p.Left+1 < len(left) {
+			np := PairLink{left[p.Left+1].P + right[p.Right].P, PairInt{p.Left + 1, p.Right}}
+			if _, ok := set[np.PairInt]; !ok {
+				heap.Push(fringe, np)
+				set[np.PairInt] = struct{}{}
+			}
+		}
+		if p.Right+1 < len(right) {
+			np := PairLink{left[p.Left].P + right[p.Right+1].P, PairInt{p.Left, p.Right + 1}}
+			if _, ok := set[np.PairInt]; !ok {
+				heap.Push(fringe, np)
+				set[np.PairInt] = struct{}{}
+			}
+		}
+	}
+	return rs
+}
+
+func mergeSumLink(left, right []*Link, leftWeight, rightWeight float64, k int) []*Link {
+	rs := []*Link{}
+	for i, j := 0, 0; i+j < k; {
+		if i < len(left) && (j >= len(right) || left[i].P+leftWeight > right[j].P+rightWeight) {
+			rs = append(rs, &Link{P: left[i].P + leftWeight, Left: left[i]})
+			i++
+		} else if j < len(right) {
+			rs = append(rs, &Link{P: right[j].P + rightWeight, Right: right[j]})
+			j++
+		} else {
+			break
+		}
+	}
+	return rs
 }

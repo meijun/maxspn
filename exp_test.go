@@ -2,10 +2,10 @@ package main
 
 import "testing"
 
-func TestLibraMPE(t *testing.T) {
-	LibraMPE()
+func TestExp(t *testing.T) {
+	Exp(LR_SPN, TopKMaxMaxMethod)
 }
 
-func TestExp(t *testing.T) {
-	Exp()
+func TestLibraSPNMPE(t *testing.T) {
+	LibraSPNMPE(LR_SPN)
 }

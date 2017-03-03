@@ -62,3 +62,14 @@ func TestDerivative(t *testing.T) {
 		}
 	}
 }
+
+func TestTopKMaxMax(t *testing.T) {
+	spn := LoadSPN(TY_SPN + "4")
+	//spn := LoadSPN(LR_SPN + "dna")
+	xs := TopKMaxMax(spn, 100)
+	xm := MaxMax(spn)
+	t.Log(" ", spn.EvalX(xm), xm)
+	for i, x := range xs {
+		t.Log(i, spn.EvalX(x), x)
+	}
+}

@@ -5,15 +5,12 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
-	"math/rand"
 	"os"
 	"os/exec"
-	"strconv"
 )
 
 const (
 	DATA_DIR = "data/"
-	TMP      = "/tmp/"
 
 	// the top one is source, the followings are generated files
 	ID_AC        = DATA_DIR + "id-ac/"
@@ -22,6 +19,8 @@ const (
 
 	LR_SPN    = DATA_DIR + "lr-spn/"
 	LR_SPN_AC = DATA_DIR + "lr-spn-ac/"
+
+	TY_SPN = DATA_DIR + "ty-spn/"
 )
 
 var SPN_AC = map[string]string{
@@ -92,13 +91,21 @@ func SumMaxBSMethod(spn SPN) float64 {
 	x := SumMax(spn)
 	return BeamSearch(spn, []XP{{x, spn.EvalX(x)}}, 31).P
 }
+func TopKMaxMaxMethod(spn SPN) float64 {
+	xs := TopKMaxMax(spn, 1000)
+	return MaxXP(EvalXBatch(spn, xs)).P
+}
+func TopKMaxMaxBSMethod(spn SPN) float64 {
+	xs := TopKMaxMax(spn, 1000)
+	return BeamSearch(spn, EvalXBatch(spn, xs), 31).P
+}
 
 func Exp(dataSet string, method func(SPN) float64) {
 	res := make([]float64, len(DATA_NAMES))
 	for i, name := range DATA_NAMES {
 		spn := LoadSPN(dataSet + name)
 		res[i] = method(spn)
-		log.Printf("[DONE] %s\n", DATA_NAMES[i])
+		log.Printf("[DONE] %s: %v\n", DATA_NAMES[i], res[i])
 	}
 	log.Printf("[DONE] %s: %v\n", dataSet, res)
 }
@@ -139,11 +146,15 @@ func libraMPE1(dataSet, dataName string) []int {
 	}
 	star[varCnt*2-1] = '\n'
 
-	evFilename := TMP + strconv.FormatUint(rand.Uint64(), 16)
-
+	evFile, err := ioutil.TempFile("", "ev.")
+	if err != nil {
+		log.Fatalf("LibraMPE create ev TempFile error: %v\n", err)
+	}
+	defer os.Remove(evFile.Name())
+	evFile.Write(star)
+	evFile.Close()
 	acFilename := dataSet + dataName
-	err := ioutil.WriteFile(evFilename, star, 0666)
-	cmd := exec.Command("libra", "acquery", "-m", acFilename, "-ev", evFilename, "-mpe")
+	cmd := exec.Command("libra", "acquery", "-m", acFilename, "-ev", evFile.Name(), "-mpe")
 	res, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("Libra error when(%s, %s): %v\n", dataSet, dataName, err)
