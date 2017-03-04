@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"time"
 )
 
 const (
@@ -100,14 +101,15 @@ func TopKMaxMaxBSMethod(spn SPN) float64 {
 	return BeamSearch(spn, EvalXBatch(spn, xs), 31).P
 }
 
-func Exp(dataSet string, method func(SPN) float64) {
+func Exp(dataSet string, method func(SPN) float64, label string) {
+	tik := time.Now()
 	res := make([]float64, len(DATA_NAMES))
 	for i, name := range DATA_NAMES {
 		spn := LoadSPN(dataSet + name)
 		res[i] = method(spn)
 		log.Printf("[DONE] %s: %v\n", DATA_NAMES[i], res[i])
 	}
-	log.Printf("[DONE] %s: %v\n", dataSet, res)
+	log.Printf("[DONE][%s][TIME %.0f] %s: %v\n", label, time.Since(tik).Minutes(), dataSet, res)
 }
 
 func LibraSPNMPE(dataSet string) {
