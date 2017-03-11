@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"sync"
 	"time"
 )
 
@@ -80,7 +81,12 @@ func SumMaxMethod(spn SPN) float64 {
 func NaiveBayesMethod(spn SPN) float64 {
 	return spn.EvalX(NaiveBayes(spn))
 }
-
+func ExactMethod(spn SPN) float64 {
+	return Exact(spn, spn.EvalX(MaxMax(spn)))
+}
+func ExactOrderMethod(spn SPN) float64 {
+	return ExactOrder(spn, math.Inf(-1)) //spn.EvalX(MaxMax(spn)))
+}
 func Prb1kBSMethod(spn SPN) float64 {
 	return BeamSearch(spn, PrbK(spn, 1000), 31).P
 }
@@ -104,11 +110,18 @@ func TopKMaxMaxBSMethod(spn SPN) float64 {
 func Exp(dataSet string, method func(SPN) float64, label string) {
 	tik := time.Now()
 	res := make([]float64, len(DATA_NAMES))
+	wg := sync.WaitGroup{}
 	for i, name := range DATA_NAMES {
-		spn := LoadSPN(dataSet + name)
-		res[i] = method(spn)
-		log.Printf("[DONE] %s: %v\n", DATA_NAMES[i], res[i])
+		wg.Add(1)
+		i, name := i, name
+		go func() {
+			spn := LoadSPN(dataSet + name)
+			res[i] = method(spn)
+			log.Printf("[DONE] %s: %v\n", DATA_NAMES[i], res[i])
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 	log.Printf("[DONE][%s][TIME %.0f] %s: %v\n", label, time.Since(tik).Minutes(), dataSet, res)
 }
 
