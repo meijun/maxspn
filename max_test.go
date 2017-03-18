@@ -48,7 +48,7 @@ func TestMax(t *testing.T) {
 func TestDerivative(t *testing.T) {
 	spn := AC2SPN(LoadAC("data/idspac/nltcs.ac"))
 	x := make([]int, len(spn.Schema))
-	dr := Derivative(spn, x)
+	dr := DerivativeX(spn, x)
 	for i := range spn.Nodes {
 		if n, ok := spn.Nodes[i].(*Trm); ok {
 			nx := make([]int, len(x))

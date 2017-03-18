@@ -23,6 +23,8 @@ const (
 	LR_SPN_AC = DATA_DIR + "lr-spn-ac/"
 
 	TY_SPN = DATA_DIR + "ty-spn/"
+
+	QUERY = DATA_DIR + "query/"
 )
 
 var SPN_AC = map[string]string{
@@ -65,6 +67,12 @@ func PrepareData() {
 			spn := LoadSPN(LR_SPN + name)
 			spn.SaveAsAC(LR_SPN_AC + name)
 		}
+
+		// TODO generate MAP query
+		if _, err := os.Stat(QUERY + name); os.IsNotExist(err) {
+			//varCnt := DATA_VAR_CNT[name]
+
+		}
 	}
 	log.Println("[DONE] PrepareData")
 }
@@ -82,10 +90,16 @@ func NaiveBayesMethod(spn SPN) float64 {
 	return spn.EvalX(NaiveBayes(spn))
 }
 func ExactMethod(spn SPN) float64 {
-	return Exact(spn, spn.EvalX(MaxMax(spn)))
+	return Exact(spn, math.Inf(-1))
+	//return Exact(spn, spn.EvalX(MaxMax(spn)))
 }
 func ExactOrderMethod(spn SPN) float64 {
-	return ExactOrder(spn, math.Inf(-1)) //spn.EvalX(MaxMax(spn)))
+	return ExactOrder(spn, math.Inf(-1))
+	//return ExactOrder(spn, spn.EvalX(MaxMax(spn)))
+}
+func ExactOrderDerMethod(spn SPN) float64 {
+	return ExactOrderDer(spn, math.Inf(-1))
+	//return ExactOrderDer(spn, spn.EvalX(MaxMax(spn)))
 }
 func Prb1kBSMethod(spn SPN) float64 {
 	return BeamSearch(spn, PrbK(spn, 1000), 31).P
@@ -108,21 +122,25 @@ func TopKMaxMaxBSMethod(spn SPN) float64 {
 }
 
 func Exp(dataSet string, method func(SPN) float64, label string) {
-	tik := time.Now()
+	tic := time.Now()
 	res := make([]float64, len(DATA_NAMES))
+	tim := make([]float64, len(DATA_NAMES))
 	wg := sync.WaitGroup{}
 	for i, name := range DATA_NAMES {
 		wg.Add(1)
 		i, name := i, name
 		go func() {
 			spn := LoadSPN(dataSet + name)
+			ticMethod := time.Now()
 			res[i] = method(spn)
-			log.Printf("[DONE] %s: %v\n", DATA_NAMES[i], res[i])
+			tim[i] = time.Since(ticMethod).Seconds()
+			log.Printf("[DONE][TIME %f] %s%s: %v\n", tim[i], dataSet, DATA_NAMES[i], res[i])
 			wg.Done()
 		}()
 	}
 	wg.Wait()
-	log.Printf("[DONE][%s][TIME %.0f] %s: %v\n", label, time.Since(tik).Minutes(), dataSet, res)
+	log.Printf("[DONE][%s][TIME %.0f][RES] %s: %v\n", label, time.Since(tic).Seconds(), dataSet, res)
+	log.Printf("[DONE][%s][TIME %.0f][TIME] %s: %v\n", label, time.Since(tic).Seconds(), dataSet, tim)
 }
 
 func LibraSPNMPE(dataSet string) {

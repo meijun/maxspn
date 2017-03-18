@@ -276,7 +276,7 @@ func nextGenP(xp XP, spn SPN, ch chan []XP) {
 
 func nextGenD(xp XP, spn SPN, ch chan []XP) {
 	res := []XP{}
-	ds := Derivative(spn, xp.X)
+	ds := DerivativeX(spn, xp.X)
 	for i, n := range spn.Nodes {
 		if n, ok := n.(*Trm); ok {
 			if xp.X[n.Kth] != n.Value && ds[i] > xp.P {
@@ -362,8 +362,12 @@ func Max(spn SPN) float64 {
 	return val[len(val)-1]
 }
 
-func Derivative(spn SPN, xs []int) []float64 {
-	pr := spn.Eval(X2Ass(xs, spn.Schema))
+func DerivativeX(spn SPN, xs []int) []float64 {
+	return Derivative(spn, X2Ass(xs, spn.Schema))
+}
+
+func Derivative(spn SPN, as [][]float64) []float64 {
+	pr := spn.Eval(as)
 	dr := make([]float64, len(spn.Nodes))
 	for i := range dr {
 		dr[i] = math.Inf(-1)
