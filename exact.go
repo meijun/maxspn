@@ -306,7 +306,7 @@ func cloneAssignment(as [][]float64) [][]float64 {
 	return bs
 }
 func derivativeOfAssignment(spn SPN, as [][]float64) [][]float64 {
-	der := Derivative(spn, as)
+	der := DerivativeS(spn, as)
 	d := make([][]float64, len(spn.Schema))
 	for i := range d {
 		d[i] = make([]float64, spn.Schema[i])
@@ -320,4 +320,85 @@ func derivativeOfAssignment(spn SPN, as [][]float64) [][]float64 {
 		}
 	}
 	return d
+}
+
+func ExactSolverBin(spn SPN) float64 {
+	as := make([][]float64, len(spn.Schema))
+	for i := range as {
+		as[i] = make([]float64, spn.Schema[i])
+		for j := range as[i] {
+			as[i][j] = 1
+		}
+	}
+	as, d := forwardCheckingBin(spn, math.Inf(-1), as)
+	return searchMaxBin(spn, math.Inf(-1), as, d)
+}
+
+func searchMaxBin(spn SPN, best float64, as [][]float64, d [][]float64) float64 {
+	if isCompleteAssignmentBin(as) {
+		return math.Max(best, math.Max(d[0][0], d[0][1]))
+	}
+	varID, valIDs := orderBin(as, d)
+	for _, valID := range valIDs {
+		as[varID] = make([]float64, 2)
+		as[varID][valID] = 1
+		asNew, dNew := forwardCheckingBin(spn, best, as)
+		if asNew[0][0] > 0 || asNew[0][1] > 0 {
+			best = searchMaxBin(spn, best, asNew, dNew)
+		}
+	}
+	return best
+}
+
+func orderBin(as [][]float64, d [][]float64) (int, []int) {
+	varID := -1
+	varIDD := math.Inf(-1)
+	for i := range as {
+		if as[i][0] > 0 && as[i][1] > 0 {
+			maxD := math.Max(d[i][0], d[i][1])
+			if varIDD < maxD {
+				varID = i
+				varIDD = maxD
+			}
+		}
+	}
+	var ids []int
+	if varID != -1 {
+		if d[varID][0] > d[varID][1] {
+			ids = []int{0, 1}
+		} else {
+			ids = []int{1, 0}
+		}
+	}
+	return varID, ids
+}
+
+func isCompleteAssignmentBin(as [][]float64) bool {
+	for i := range as {
+		if as[i][0] > 0 && as[i][1] > 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func forwardCheckingBin(spn SPN, best float64, as [][]float64) ([][]float64, [][]float64) {
+	as = cloneAssignment(as)
+	for {
+		d := derivativeOfAssignment(spn, as)
+		changed := false
+		for i := range as {
+			if as[i][0] != 0 && best >= d[i][0] {
+				as[i][0] = 0
+				changed = true
+			}
+			if as[i][1] != 0 && best >= d[i][1] {
+				as[i][1] = 0
+				changed = true
+			}
+		}
+		if !changed {
+			return as, d
+		}
+	}
 }

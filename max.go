@@ -394,6 +394,117 @@ func Derivative(spn SPN, as [][]float64) []float64 {
 	return dr
 }
 
+func DerivativeS(spn SPN, as [][]float64) []float64 {
+	pr := spn.Eval(as)
+	dr := make([]float64, len(spn.Nodes))
+	for i := range dr {
+		dr[i] = math.Inf(-1)
+	}
+	dr[len(dr)-1] = 0.0
+	for i := len(spn.Nodes) - 1; i >= 0; i-- {
+		switch n := spn.Nodes[i].(type) {
+		case *Sum:
+			for _, e := range n.Edges {
+				dr[e.Node.ID()] = logSumExp(dr[e.Node.ID()], dr[i]+e.Weight)
+			}
+		case *Prd:
+			zeroCnt := 0
+			for _, e := range n.Edges {
+				if math.IsInf(pr[e.Node.ID()], -1) {
+					zeroCnt++
+					if zeroCnt == 2 {
+						break
+					}
+				}
+			}
+			for _, e := range n.Edges {
+				other := 0.0
+				if zeroCnt == 0 {
+					other = pr[i] - pr[e.Node.ID()]
+				} else if zeroCnt == 1 {
+					if math.IsInf(pr[e.Node.ID()], -1) {
+						for _, f := range n.Edges {
+							if !math.IsInf(pr[f.Node.ID()], -1) {
+								other += pr[f.Node.ID()]
+							}
+						}
+					} else {
+						other = math.Inf(-1)
+					}
+				} else {
+					other = math.Inf(-1)
+				}
+				dr[e.Node.ID()] = logSumExp(dr[e.Node.ID()], dr[i]+other)
+			}
+		}
+	}
+	return dr
+}
+
+func DerivativeSS(spn SPN, as [][]float64) []float64 {
+	pr := make([]float64, len(spn.Nodes))
+	zc := make([]int, len(spn.Nodes))
+	for i, n := range spn.Nodes {
+		switch n := n.(type) {
+		case *Trm:
+			pr[i] = math.Log(as[n.Kth][n.Value])
+		case *Sum:
+			pr[i] = logSumExpF(len(n.Edges), func(k int) float64 {
+				if zc[n.Edges[k].Node.ID()] > 0 {
+					return math.Inf(-1)
+				}
+				return n.Edges[k].Weight + pr[n.Edges[k].Node.ID()]
+			})
+		case *Prd:
+			prd := 0.0
+			z := 0
+			for _, e := range n.Edges {
+				if math.IsInf(pr[e.Node.ID()], -1) {
+					z++
+					if z == 2 {
+						break
+					}
+				} else {
+					prd += pr[e.Node.ID()]
+				}
+			}
+			zc[i] = z
+			pr[i] = prd
+		}
+	}
+
+	dr := make([]float64, len(spn.Nodes))
+	for i := range dr {
+		dr[i] = math.Inf(-1)
+	}
+	dr[len(dr)-1] = 0.0
+	for i := len(spn.Nodes) - 1; i >= 0; i-- {
+		switch n := spn.Nodes[i].(type) {
+		case *Sum:
+			for _, e := range n.Edges {
+				dr[e.Node.ID()] = logSumExp(dr[e.Node.ID()], dr[i]+e.Weight)
+			}
+		case *Prd:
+			for _, e := range n.Edges {
+				other := 0.0
+				if zc[i] == 0 {
+					other = pr[i] - pr[e.Node.ID()]
+				} else if zc[i] == 1 {
+					if math.IsInf(pr[e.Node.ID()], -1) {
+						other = pr[i]
+					} else {
+						other = math.Inf(-1)
+					}
+				} else {
+					other = math.Inf(-1)
+				}
+				dr[e.Node.ID()] = logSumExp(dr[e.Node.ID()], dr[i]+other)
+			}
+		}
+	}
+	return dr
+}
+
 type Link struct {
 	P     float64
 	Left  *Link

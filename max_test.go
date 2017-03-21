@@ -2,6 +2,7 @@ package main
 
 import (
 	"math"
+	"math/rand"
 	"testing"
 )
 
@@ -58,6 +59,50 @@ func TestDerivative(t *testing.T) {
 			//t.Logf("%d %d: %f %f %f\n", n.Kth, n.Value, dr[i], np, math.Abs(dr[i]-np))
 			if math.Abs(dr[i]-np) > 1e-6 {
 				t.Errorf("%d %d: %f %f %f\n", n.Kth, n.Value, dr[i], np, math.Abs(dr[i]-np))
+			}
+		}
+	}
+}
+
+func TestDerivativeS(t *testing.T) {
+	spn := LoadSPN(LR_SPN + "nltcs")
+	times := 10
+	for kth := 0; kth < times; kth++ {
+		as := make([][]float64, len(spn.Schema))
+		for i := range as {
+			as[i] = make([]float64, 2)
+			as[i][0] = float64(rand.Intn(2))
+			as[i][1] = float64(rand.Intn(2))
+		}
+		d := Derivative(spn, as)
+		ds := DerivativeS(spn, as)
+		//t.Log(d)
+		//t.Log(ds)
+		for i := range d {
+			if math.Abs(d[i]-ds[i]) > 1e-6 {
+				t.Fail()
+			}
+		}
+	}
+}
+
+func TestDerivativeSS(t *testing.T) {
+	spn := LoadSPN(LR_SPN + "nltcs")
+	times := 10
+	for kth := 0; kth < times; kth++ {
+		as := make([][]float64, len(spn.Schema))
+		for i := range as {
+			as[i] = make([]float64, 2)
+			as[i][0] = float64(rand.Intn(2))
+			as[i][1] = float64(rand.Intn(2))
+		}
+		d := Derivative(spn, as)
+		ds := DerivativeSS(spn, as)
+		//t.Log(d)
+		//t.Log(ds)
+		for i := range d {
+			if math.Abs(d[i]-ds[i]) > 1e-6 {
+				t.Fail()
 			}
 		}
 	}

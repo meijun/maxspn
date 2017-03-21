@@ -125,6 +125,10 @@ func Exp(dataSet string, method func(SPN) float64, label string) {
 	tic := time.Now()
 	res := make([]float64, len(DATA_NAMES))
 	tim := make([]float64, len(DATA_NAMES))
+	finally = append(finally, func() {
+		log.Printf("[DONE][%s][TIME %.0f][RES] %s: %v\n", label, time.Since(tic).Seconds(), dataSet, res)
+		log.Printf("[DONE][%s][TIME %.0f][TIME] %s: %v\n", label, time.Since(tic).Seconds(), dataSet, tim)
+	})
 	wg := sync.WaitGroup{}
 	for i, name := range DATA_NAMES {
 		wg.Add(1)
@@ -139,8 +143,6 @@ func Exp(dataSet string, method func(SPN) float64, label string) {
 		}()
 	}
 	wg.Wait()
-	log.Printf("[DONE][%s][TIME %.0f][RES] %s: %v\n", label, time.Since(tic).Seconds(), dataSet, res)
-	log.Printf("[DONE][%s][TIME %.0f][TIME] %s: %v\n", label, time.Since(tic).Seconds(), dataSet, tim)
 }
 
 func LibraSPNMPE(dataSet string) {
