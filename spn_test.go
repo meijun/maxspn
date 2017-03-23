@@ -73,3 +73,46 @@ func TestSPN_Plot(t *testing.T) {
 	pr(TY_SPN + "2")
 	pr(TY_SPN + "3")
 }
+
+func TestSPN_QuerySPN(t *testing.T) {
+	spn := LoadSPN(LR_SPN + "nltcs")
+	qSPN := spn.QuerySPN([]byte("????????????????"))
+	for times := 0; times < 100; times++ {
+		as := make([][]float64, len(spn.Schema))
+		for i := range as {
+			as[i] = make([]float64, 2)
+			as[i][0] = 1 // float64(rand.Intn(2))
+			as[i][1] = float64(rand.Intn(2))
+		}
+		se := spn.Eval(as)
+		qe := qSPN.Eval(as)
+		for i := range se {
+			if math.Abs(se[i]-qe[i]) > 1e-6 {
+				t.Fail()
+			}
+		}
+	}
+}
+
+func TestSPN_QuerySPN2(t *testing.T) {
+	spn := LoadSPN(LR_SPN + "nltcs")
+	q := []byte("??????????******")
+	qSPN := spn.QuerySPN(q)
+	for times := 0; times < 100; times++ {
+		as := make([][]float64, len(spn.Schema))
+		for i := range as {
+			as[i] = make([]float64, 2)
+			as[i][0] = float64(rand.Intn(2))
+			as[i][1] = 1 // float64(rand.Intn(2))
+			if q[i] == '*' {
+				as[i][0] = 1
+				as[i][1] = 1
+			}
+		}
+		se := spn.Eval(as)
+		qe := qSPN.Eval(as)
+		if math.Abs(se[len(se)-1]-qe[len(qe)-1]) > 1e-6 {
+			t.Fail()
+		}
+	}
+}

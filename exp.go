@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math"
+	"math/rand"
 	"os"
 	"os/exec"
 	"sync"
@@ -70,8 +72,28 @@ func PrepareData() {
 
 		// TODO generate MAP query
 		if _, err := os.Stat(QUERY + name); os.IsNotExist(err) {
-			//varCnt := DATA_VAR_CNT[name]
-
+			varCnt := DATA_VAR_CNT[name]
+			data := []byte{}
+			for row := 0; row < 100; row++ {
+				for i := 0; i < varCnt; i++ {
+					var c byte
+					switch rand.Intn(3) {
+					case 0: // hidden
+						c = '*'
+					case 1: // evidence
+						c = byte('0' + rand.Intn(2))
+					case 2: // query
+						c = '?'
+					}
+					if i != 0 {
+						data = append(data, ' ')
+					}
+					data = append(data, c)
+				}
+				data = append(data, '\n')
+			}
+			data = append(data, []byte("EOF")...)
+			ioutil.WriteFile(QUERY+name, data, 0666)
 		}
 	}
 	log.Println("[DONE] PrepareData")
@@ -217,4 +239,48 @@ func ACMaxMaxExp(dataSet string) {
 		ps[i] = p
 	}
 	log.Println(ps)
+}
+
+func ExpQuerySPN(dataSet string) {
+	for _, name := range DATA_NAMES {
+		qf, err := ioutil.ReadFile(QUERY + name)
+		if err != nil {
+			log.Fatalf("ExpQuerySPN read file %s: %v\n", QUERY+name, err)
+		}
+		qs := bytes.Split(qf, []byte{'\n'})
+		qCnt := len(qs) - 1
+		for qCnt > 0 && string(qs[qCnt]) != "EOF" {
+			qCnt--
+		}
+		if qCnt == 0 {
+			log.Fatalf("Empty query file: %s\n", QUERY+name)
+		}
+		qs = qs[:qCnt]
+		spn := LoadSPN(dataSet + name)
+		for qj, q := range qs {
+			qt := bytes.Split(q, []byte{' '})
+			q = q[:len(qt)]
+			for k := range qt {
+				q[k] = qt[k][0]
+			}
+			qSPN := spn.QuerySPN(q)
+			mm := qSPN.EvalX(MaxMax(qSPN))
+			sm := qSPN.EvalX(SumMax(qSPN))
+			ex := ExactOrderDer(qSPN, mm)
+			eq := func(v float64) int {
+				if math.Abs(v-ex) < 1e-6 {
+					return 1
+				}
+				return 0
+			}
+			if math.Abs(ex-mm) > 1e-6 {
+				t10 := MaxXP(EvalXBatch(qSPN, TopKMaxMax(qSPN, 10))).P
+				t100 := MaxXP(EvalXBatch(qSPN, TopKMaxMax(qSPN, 100))).P
+				t1k := MaxXP(EvalXBatch(qSPN, TopKMaxMax(qSPN, 1000))).P
+				log.Printf("Found %s line: %d, mm: %f, exact: %f, %d%d%d\n", dataSet+name, qj+1, mm, ex, eq(t10), eq(t100), eq(t1k))
+			}
+			log.Printf("[DONE] %d %d%d\n", qj, eq(mm), eq(sm))
+		}
+		log.Printf("[DONE] %s\n", dataSet+name)
+	}
 }
