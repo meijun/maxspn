@@ -666,7 +666,7 @@ func MC(spn SPN) XP {
 }
 
 func evalAt(spn SPN, x []int, at int) float64 {
-	val := make([]float64, at + 1)
+	val := make([]float64, at+1)
 	for i := 0; i <= at; i++ {
 		n := spn.Nodes[i]
 		switch n := n.(type) {
