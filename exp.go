@@ -142,6 +142,9 @@ func TopKMaxMaxBSMethod(spn SPN) float64 {
 	xs := TopKMaxMax(spn, 1000)
 	return BeamSearch(spn, EvalXBatch(spn, xs), 31).P
 }
+func MCMethod(spn SPN) float64 {
+	return MC(spn).P
+}
 
 func Exp(dataSet string, method func(SPN) float64, label string) {
 	tic := time.Now()

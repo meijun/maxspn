@@ -625,3 +625,70 @@ func mergeSumLink(left, right []*Link, leftWeight, rightWeight float64, k int) [
 	}
 	return rs
 }
+
+func MC(spn SPN) XP {
+	mc := make([]XP, len(spn.Nodes))
+	for i, n := range spn.Nodes {
+		switch n := n.(type) {
+		case *Trm:
+			x := make([]int, len(spn.Schema))
+			for xi := range x {
+				x[xi] = -1
+			}
+			x[n.Kth] = n.Value
+			mc[i] = XP{x, 0}
+		case *Sum:
+			xpBest := XP{nil, math.Inf(-1)}
+			for _, e := range n.Edges {
+				p := evalAt(spn, mc[e.Node.ID()].X, i)
+				if xpBest.P < p {
+					xpBest = XP{mc[e.Node.ID()].X, p}
+				}
+			}
+			mc[i] = xpBest
+		case *Prd:
+			x := make([]int, len(spn.Schema))
+			for xi := range x {
+				x[xi] = -1
+			}
+			for _, e := range n.Edges {
+				xe := mc[e.Node.ID()].X
+				for xi := range xe {
+					if xe[xi] != -1 {
+						x[xi] = xe[xi]
+					}
+				}
+			}
+			mc[i] = XP{x, evalAt(spn, x, i)}
+		}
+	}
+	return mc[len(spn.Nodes)-1]
+}
+
+func evalAt(spn SPN, x []int, at int) float64 {
+	val := make([]float64, at + 1)
+	for i := 0; i <= at; i++ {
+		n := spn.Nodes[i]
+		switch n := n.(type) {
+		case *Trm:
+			var v float64
+			if x[n.Kth] == n.Value {
+				v = 0
+			} else {
+				v = math.Inf(-1)
+			}
+			val[i] = v
+		case *Sum:
+			val[i] = logSumExpF(len(n.Edges), func(k int) float64 {
+				return n.Edges[k].Weight + val[n.Edges[k].Node.ID()]
+			})
+		case *Prd:
+			prd := 0.0
+			for _, e := range n.Edges {
+				prd += val[e.Node.ID()]
+			}
+			val[i] = prd
+		}
+	}
+	return val[at]
+}

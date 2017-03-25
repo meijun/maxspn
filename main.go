@@ -35,7 +35,7 @@ func main() {
 		//Exp(dataSet, Prb1kBSMethod, "P1kBS")
 		//Exp(dataSet, Max, "Max")
 		//Exp(dataSet, ExactSolver, "Exact")
-		Exp(dataSet, ExactOrderDerMethod, "Exact")
+		Exp(dataSet, MCMethod, "MC")
 	}
 	f(LR_SPN)
 	//f(ID_AC_SPN)
