@@ -287,3 +287,121 @@ func ExpQuerySPN(dataSet string) {
 		log.Printf("[DONE] %s\n", dataSet+name)
 	}
 }
+
+const (
+	QEH_Q = -1
+	QEH_H = -2
+)
+
+func GenMAPQuery() [][][][]int {
+	qehsss := [][][][]int{}
+	for h := 1; h <= 8; h++ {
+		q := 1
+		//e := 10 - q - h
+		//dir := fmt.Sprintf("%s%d%d%d.qeh", DATA_DIR, q, e, h)
+		//os.Mkdir(dir, 0666)
+		qehss := [][][]int{}
+		for di /*, name*/ := range DATA_NAMES {
+			//data := []byte{}
+			qehs := [][]int{}
+			for row := 0; row < 100; row++ {
+				qeh := make([]int, VAR_CNT[di])
+				qc := len(qeh) * q / 10
+				hc := len(qeh) * h / 10
+				for i := range qeh {
+					switch {
+					case i < qc:
+						qeh[i] = QEH_Q
+					case i < qc+hc:
+						qeh[i] = QEH_H
+					default: // evidence
+						qeh[i] = rand.Intn(2)
+					}
+				}
+				qeh = shuffle(qeh)
+				qehs = append(qehs, qeh)
+				//for i, v := range qeh {
+				//	if i != 0 {
+				//		data = append(data, ' ')
+				//	}
+				//	switch v {
+				//	case QEH_Q:
+				//		data = append(data, '?')
+				//	case QEH_H:
+				//		data = append(data, '*')
+				//	default:
+				//		data = append(data, byte(v + '0'))
+				//	}
+				//}
+				//data = append(data, '\n')
+			}
+			//data = append(data, []byte("EOF")...)
+			//if err := ioutil.WriteFile(dir + "/" + name, data, 0666); err != nil {
+			//	log.Fatal(err)
+			//}
+			qehss = append(qehss, qehs)
+		}
+		qehsss = append(qehsss, qehss)
+	}
+	return qehsss
+}
+func shuffle(is []int) []int {
+	rs := make([]int, len(is))
+	for i, v := range rand.Perm(len(is)) {
+		rs[i] = is[v]
+	}
+	return rs
+}
+
+func ExpMAP() {
+	qsss := GenMAPQuery()
+	for h := 1; h <= 8; h++ {
+		for ni, name := range DATA_NAMES {
+			spn := LoadSPN(LR_SPN + name)
+			qs := qsss[h-1][ni]
+			cntMC, cntT100 := 0, 0
+			timMC, timT100 := 0., 0.
+			mux := sync.Mutex{}
+			wg := sync.WaitGroup{}
+			for _, q := range qs {
+				q := q
+				wg.Add(1)
+				go func() {
+					qb := make([]byte, len(q))
+					for i, v := range q {
+						switch v {
+						case QEH_Q:
+							qb[i] = '?'
+						case QEH_H:
+							qb[i] = '*'
+						default:
+							qb[i] = byte('0' + v)
+						}
+					}
+					qSPN := spn.QuerySPN(qb)
+					tic := time.Now()
+					mc := MC(qSPN).P
+					mux.Lock()
+					timMC += time.Since(tic).Seconds()
+					mux.Unlock()
+					tic = time.Now()
+					t100 := MaxXP(EvalXBatch(qSPN, TopKMaxMax(qSPN, 100))).P
+					mux.Lock()
+					timT100 += time.Since(tic).Seconds()
+					if math.Abs(mc-t100) > 1e-6 {
+						if mc > t100 {
+							cntMC++
+						} else {
+							cntT100++
+						}
+					}
+					mux.Unlock()
+					wg.Done()
+				}()
+			}
+			wg.Wait()
+			log.Printf("[h %d][%20s] cntMC: %3d, cntT100: %3d, timMC: %5.0f, timT100: %5.0f\n",
+				h, name, cntMC, cntT100, timMC, timT100)
+		}
+	}
+}
