@@ -363,7 +363,7 @@ func Max(spn SPN) float64 {
 }
 
 func DerivativeX(spn SPN, xs []int) []float64 {
-	return Derivative(spn, X2Ass(xs, spn.Schema))
+	return DerivativeS(spn, X2Ass(xs, spn.Schema))
 }
 
 func Derivative(spn SPN, as [][]float64) []float64 {

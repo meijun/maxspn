@@ -431,7 +431,7 @@ func (spn SPN) QuerySPN(q []byte) SPN {
 		}
 	}
 	if varCnt == 0 {
-		log.Println(q)
+		log.Println(string(q))
 		log.Fatal("QuerySPN no '?'")
 	}
 	nn := len(spn.Nodes)
@@ -448,6 +448,79 @@ func (spn SPN) QuerySPN(q []byte) SPN {
 					w = 0
 				}
 				if n.Value == 1 && (q[n.Kth] == '1' || q[n.Kth] == '*') {
+					w = 0
+				}
+				we[i] = w
+			}
+		case *Sum:
+			if ns[n.Edges[0].Node.ID()] == nil {
+				we[i] = logSumExpF(len(n.Edges), func(k int) float64 {
+					return n.Edges[k].Weight + we[n.Edges[k].Node.ID()]
+				})
+			} else {
+				es := make([]SumEdge, len(n.Edges))
+				for j, e := range n.Edges {
+					es[j] = SumEdge{e.Weight + we[e.Node.ID()], ns[e.Node.ID()]}
+				}
+				ns[i] = &Sum{Edges: es}
+			}
+		case *Prd:
+			es := make([]PrdEdge, 0, len(n.Edges))
+			w := 0.0
+			for _, e := range n.Edges {
+				w += we[e.Node.ID()]
+				if ns[e.Node.ID()] != nil {
+					es = append(es, PrdEdge{ns[e.Node.ID()]})
+				}
+			}
+			we[i] = w
+			if len(es) > 0 {
+				ns[i] = &Prd{Edges: es}
+			}
+		}
+	}
+	if _, ok := ns[nn-1].(*Sum); !ok {
+		ns[nn] = &Sum{Edges: []SumEdge{{we[nn-1], ns[nn-1]}}}
+	}
+	nodes := make([]Node, 0, nn+1)
+	for _, n := range ns {
+		if n != nil {
+			n.SetID(len(nodes))
+			nodes = append(nodes, n)
+		}
+	}
+	return SPN{nodes, schema}
+}
+
+func (spn SPN) StageSPN(q []int) SPN {
+	idMap := map[int]int{}
+	varCnt := 0
+	schema := make([]int, 0, len(spn.Schema))
+	for i, c := range q {
+		if c == -1 {
+			idMap[i] = varCnt
+			varCnt++
+			schema = append(schema, spn.Schema[i])
+		}
+	}
+	if varCnt == 0 {
+		log.Println(q)
+		log.Fatal("q has no -1")
+	}
+	nn := len(spn.Nodes)
+	ns := make([]Node, nn+1)
+	we := make([]float64, nn)
+	for i, n := range spn.Nodes {
+		switch n := n.(type) {
+		case *Trm:
+			if q[n.Kth] == -1 {
+				ns[i] = &Trm{Kth: idMap[n.Kth], Value: n.Value}
+			} else {
+				w := math.Inf(-1)
+				if n.Value == 0 && q[n.Kth] == 0 {
+					w = 0
+				}
+				if n.Value == 1 && q[n.Kth] == 1 {
 					w = 0
 				}
 				we[i] = w

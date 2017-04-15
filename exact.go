@@ -402,3 +402,77 @@ func forwardCheckingBin(spn SPN, best float64, as [][]float64) ([][]float64, [][
 		}
 	}
 }
+
+func ExactStage(spn SPN, x []int, best float64) float64 {
+	x2 := make([]int, len(x))
+	copy(x2, x)
+	x = x2
+	var d [][]float64
+	for {
+		updated := false
+		d = derivativeOfAssignmentX(spn, x)
+		for i := range x {
+			if x[i] == -1 {
+				if d[i][0] <= best && d[i][1] <= best {
+					return best
+				}
+				if d[i][0] <= best {
+					x[i] = 1
+					updated = true
+				}
+				if d[i][1] <= best {
+					x[i] = 0
+					updated = true
+				}
+			}
+		}
+		if !updated {
+			break
+		}
+	}
+	cnt := 0
+	for i := range x {
+		if x[i] == -1 {
+			cnt++
+		}
+	}
+	if cnt > 1 && len(x) - cnt >= 100 {
+		spn = spn.StageSPN(x)
+		x = make([]int, len(spn.Schema))
+		for i := range x {
+			x[i] = -1
+		}
+		d = derivativeOfAssignmentX(spn, x)
+	}
+	varID := -1
+	valID := -1
+	for i := range x {
+		if x[i] == -1 {
+			var valI int
+			if d[i][0] < d[i][1] {
+				valI = 1
+			} else {
+				valI = 0
+			}
+			if varID == -1 || d[varID][valID] < d[i][valI] {
+				varID = i
+				valID = valI
+			}
+		}
+	}
+	if varID == -1 {
+		return math.Max(best, d[0][x[0]])
+	}
+	if cnt == 1 {
+		return d[varID][valID]
+	}
+	x[varID] = valID
+	best = ExactStage(spn, x, best)
+	x[varID] = 1 - valID
+	best = ExactStage(spn, x, best)
+	return best
+}
+
+func derivativeOfAssignmentX(spn SPN, x []int) [][]float64 {
+	return derivativeOfAssignment(spn, X2Ass(x, spn.Schema))
+}

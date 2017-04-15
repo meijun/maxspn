@@ -25,18 +25,5 @@ func init() {
 var finally []func()
 
 func main() {
-	//defer profile.Start().Stop()
-	f := func(dataSet string) {
-		//Exp(dataSet, MaxMaxMethod, "MM")
-		//Exp(dataSet, MaxMaxBSMethod, "MM_BS")
-		//Exp(dataSet, SumMaxMethod, "SM")
-		//Exp(dataSet, SumMaxBSMethod, "SM_BS")
-		//Exp(dataSet, Prb1kMethod, "P1k")
-		//Exp(dataSet, Prb1kBSMethod, "P1kBS")
-		//Exp(dataSet, Max, "Max")
-		//Exp(dataSet, ExactSolver, "Exact")
-		Exp(dataSet, MCMethod, "MC")
-	}
-	f(LR_SPN)
-	//f(ID_AC_SPN)
+
 }

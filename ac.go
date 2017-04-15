@@ -237,7 +237,13 @@ func X2Ass(xs []int, schema []int) [][]float64 {
 	ass := make([][]float64, len(xs))
 	for i, x := range xs {
 		ass[i] = make([]float64, schema[i])
-		ass[i][x] = 1.0
+		if x == -1 {
+			for v := 0; v < schema[i]; v++ {
+				ass[i][v] = 1
+			}
+		} else {
+			ass[i][x] = 1
+		}
 	}
 	return ass
 }
