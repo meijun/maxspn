@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"flag"
 )
 
 func init() {
@@ -25,5 +26,6 @@ func init() {
 var finally []func()
 
 func main() {
-
+	flag.Parse()
+	FinalExperiment()
 }
