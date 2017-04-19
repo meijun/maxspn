@@ -10,7 +10,9 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -31,7 +33,8 @@ var (
 	ORDERING = flag.Bool("ORDERING", false, "Ordering approach")
 	STAGE    = flag.Bool("STAGE", false, "Stage approach")
 
-	QEH = flag.String("QEH", "", "MAP query DIR")
+	QEH  = flag.String("QEH", "", "MAP query DIR")
+	DATA = flag.String("DATA", "", "MAP query DATASETS (delimited by ',')")
 
 	TIMEOUT     = flag.Int("TIMEOUT", 600, "Timeout (in seconds)")
 	GROUP_COUNT = flag.Int("GROUP_COUNT", QUERY_COUNT, "Group count")
@@ -41,6 +44,7 @@ func FinalExperiment() {
 	if *QEH == "" {
 		return
 	}
+	log.Printf("QEH: %s\n", *QEH)
 	os.Mkdir(RESULT_DIR+*QEH, 0777)
 	switch {
 	case *BT:
@@ -67,7 +71,13 @@ func FinalExperiment() {
 type MAXMethod func(spn SPN) float64
 
 func mapInference(methodName string, method MAXMethod) {
-	path := fmt.Sprintf("%s%s/%s/", RESULT_DIR, *QEH, methodName)
+	suffix := ""
+	if *KBT {
+		suffix = fmt.Sprintf("%d", *KBT_K)
+	} else if *BS {
+		suffix = fmt.Sprintf("%d", *BS_B)
+	}
+	path := fmt.Sprintf("%s%s/%s%s/", RESULT_DIR, *QEH, methodName, suffix)
 	if err := os.MkdirAll(path, 0777); err != nil {
 		log.Fatalf("Mkdir %s: %v\n", path, err)
 	}
@@ -77,9 +87,14 @@ func mapInference(methodName string, method MAXMethod) {
 	if err := os.MkdirAll(path+"result", 0777); err != nil {
 		log.Fatalf("Mkdir %sresult: %v\n", path, err)
 	}
-	for _, dataset := range DATASETS {
-		log.Printf("[DOING]%s %s\n", methodName, dataset)
+	datasets := DATASETS
+	if *DATA != "" {
+		datasets = strings.Split(*DATA, ",")
+	}
+	for _, dataset := range datasets {
 		mapInferenceDataset(path, dataset, methodName, method)
+		log.Printf("[DONE]%s %s\n", methodName, dataset)
+		runtime.GC()
 	}
 }
 func mapInferenceDataset(path string, dataset string, methodName string, method MAXMethod) {
@@ -108,13 +123,14 @@ func mapInferenceDataset(path string, dataset string, methodName string, method 
 			res[i] = method(querySPN)
 			tim[i] = time.Since(tic).Seconds()
 
-			if tim[i] > float64(*TIMEOUT)-1 {
-				log.Printf("TIMEOUT: %s %s %s %d", path, dataset, methodName, i)
-			}
+			//if tim[i] > float64(*TIMEOUT)-1 {
+			//	log.Printf("TIMEOUT: %s %s %s %d", path, dataset, methodName, i)
+			//}
 			wg.Done()
 		}()
 		if (i+1)%*GROUP_COUNT == 0 {
 			wg.Wait()
+			runtime.GC()
 		}
 	}
 	wg.Wait()
@@ -146,7 +162,8 @@ func AMAPMethod(spn SPN) float64 {
 	return amap(spn).P
 }
 func BSMethod(spn SPN) float64 {
-	return BeamSearch(spn, PrbK(spn, *BS_B), *BS_B).P
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(*TIMEOUT)*time.Second)
+	return BeamSearchSerial(ctx, spn, PrbKSerial(spn, *BS_B), *BS_B).P
 }
 func KBTMethod(spn SPN) float64 {
 	xs := TopKMaxMax(spn, *KBT_K)
@@ -335,4 +352,53 @@ func amapEvalAt(spn SPN, x []int, at int) float64 {
 		}
 	}
 	return val[at]
+}
+
+func BeamSearchSerial(ctx context.Context, spn SPN, xps []XP, beamSize int) XP {
+	best := XP{P: math.Inf(-1)}
+	for i := 0; len(xps) > 0; i++ {
+		xps = uniqueX(xps)
+		xps = topK(xps, beamSize)
+		xp1 := topK(xps, 1)
+		if best.P < xp1[0].P {
+			best = xp1[0]
+		}
+		select {
+		case <-ctx.Done():
+			return best
+		default:
+		}
+		xps = nextGensSerial(xps, spn)
+	}
+	return best
+}
+
+func nextGensSerial(xps []XP, spn SPN) []XP {
+	res := []XP{}
+	resChan := make([]chan []XP, len(xps))
+	for i, xp := range xps {
+		ch := make(chan []XP, 1)
+		nextGenD(xp, spn, ch)
+		resChan[i] = ch
+	}
+	for _, ch := range resChan {
+		res = append(res, <-ch...)
+	}
+	return res
+}
+func PrbKSerial(spn SPN, k int) []XP {
+	prt := partition(spn)
+	res := make([]XP, k)
+	wg := sync.WaitGroup{}
+	for times := 0; times < k; times++ {
+		wg.Add(1)
+		func(i int) {
+			x := prb1(spn, prt)
+			p := spn.EvalX(x)
+			res[i] = XP{x, p}
+			wg.Done()
+		}(times)
+	}
+	wg.Wait()
+	return res
 }
