@@ -1,18 +1,18 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"strconv"
-	"bytes"
-	"time"
 	"sync"
-	"math"
-	"context"
+	"time"
 )
 
 var (
@@ -33,7 +33,7 @@ var (
 
 	QEH = flag.String("QEH", "", "MAP query DIR")
 
-	TIMEOUT = flag.Int("TIMEOUT", 600, "Timeout (in seconds)")
+	TIMEOUT     = flag.Int("TIMEOUT", 600, "Timeout (in seconds)")
 	GROUP_COUNT = flag.Int("GROUP_COUNT", QUERY_COUNT, "Group count")
 )
 
@@ -41,7 +41,7 @@ func FinalExperiment() {
 	if *QEH == "" {
 		return
 	}
-	os.Mkdir(RESULT_DIR + *QEH, 0777)
+	os.Mkdir(RESULT_DIR+*QEH, 0777)
 	switch {
 	case *BT:
 		mapInference("BT", BTMethod)
@@ -71,10 +71,10 @@ func mapInference(methodName string, method MAXMethod) {
 	if err := os.MkdirAll(path, 0777); err != nil {
 		log.Fatalf("Mkdir %s: %v\n", path, err)
 	}
-	if err := os.MkdirAll(path + "time", 0777); err != nil {
+	if err := os.MkdirAll(path+"time", 0777); err != nil {
 		log.Fatalf("Mkdir %stime: %v\n", path, err)
 	}
-	if err := os.MkdirAll(path + "result", 0777); err != nil {
+	if err := os.MkdirAll(path+"result", 0777); err != nil {
 		log.Fatalf("Mkdir %sresult: %v\n", path, err)
 	}
 	for _, dataset := range DATASETS {
@@ -108,12 +108,12 @@ func mapInferenceDataset(path string, dataset string, methodName string, method 
 			res[i] = method(querySPN)
 			tim[i] = time.Since(tic).Seconds()
 
-			if tim[i] > float64(*TIMEOUT) - 1 {
+			if tim[i] > float64(*TIMEOUT)-1 {
 				log.Printf("TIMEOUT: %s %s %s %d", path, dataset, methodName, i)
 			}
 			wg.Done()
 		}()
-		if (i+1) % *GROUP_COUNT == 0 {
+		if (i+1)%*GROUP_COUNT == 0 {
 			wg.Wait()
 		}
 	}
@@ -169,7 +169,7 @@ const (
 	EXPERIMENT_DIR = "experiment/"
 	SPN_DIR        = EXPERIMENT_DIR + "learn.spn/"
 	QEH_DIR        = EXPERIMENT_DIR + "map.qeh/"
-	RESULT_DIR = EXPERIMENT_DIR + "result.csv/"
+	RESULT_DIR     = EXPERIMENT_DIR + "result.csv/"
 
 	QUERY_COUNT = 1000
 )
@@ -260,8 +260,8 @@ func generateQEH1(schema []int, q int, e int, h int) []int {
 
 func amap(spn SPN) XP {
 	mc := make([]XP, len(spn.Nodes))
-	ctx, _ := context.WithTimeout(context.Background(), time.Duration(*TIMEOUT) * time.Second)
-	timeout := XP{X:nil, P:math.NaN()}
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(*TIMEOUT)*time.Second)
+	timeout := XP{X: nil, P: math.NaN()}
 	for i, n := range spn.Nodes {
 		select {
 		case <-ctx.Done():

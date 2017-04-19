@@ -1,11 +1,11 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"math/rand"
 	"os"
 	"os/signal"
-	"flag"
 )
 
 func init() {
