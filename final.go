@@ -37,7 +37,7 @@ var (
 	DATA = flag.String("DATA", "", "MAP query DATASETS (delimited by ',')")
 
 	TIMEOUT     = flag.Int("TIMEOUT", 600, "Timeout (in seconds)")
-	GROUP_COUNT = flag.Int("GROUP_COUNT", QUERY_COUNT, "Group count")
+	GROUP_COUNT = flag.Int("GROUP_COUNT", 25, "Group count")
 )
 
 func FinalExperiment() {
@@ -166,8 +166,11 @@ func BSMethod(spn SPN) float64 {
 	return BeamSearchSerial(ctx, spn, PrbKSerial(spn, *BS_B), *BS_B).P
 }
 func KBTMethod(spn SPN) float64 {
-	xs := TopKMaxMax(spn, *KBT_K)
-	return MaxXP(EvalXBatch(spn, xs)).P
+	xs := TopKMaxMaxTimeout(spn, *KBT_K)
+	if len(xs) == 0 {
+		return math.NaN()
+	}
+	return MaxXP(EvalXBatchSerial(spn, xs)).P
 }
 func MPMethod(spn SPN) float64 {
 	return 0.0
@@ -301,7 +304,7 @@ func amap(spn SPN) XP {
 					return timeout
 				default:
 				}
-				p := amapEvalAt(spn, mc[e.Node.ID()].X, i)
+				p := evalAt(spn, mc[e.Node.ID()].X, i)
 				if xpBest.P < p {
 					xpBest = XP{mc[e.Node.ID()].X, p}
 				}
@@ -320,38 +323,10 @@ func amap(spn SPN) XP {
 					}
 				}
 			}
-			mc[i] = XP{x, amapEvalAt(spn, x, i)}
+			mc[i] = XP{x, evalAt(spn, x, i)}
 		}
 	}
 	return mc[len(spn.Nodes)-1]
-}
-
-func amapEvalAt(spn SPN, x []int, at int) float64 {
-	val := make([]float64, at+1)
-	for i := 0; i <= at; i++ {
-		n := spn.Nodes[i]
-		switch n := n.(type) {
-		case *Trm:
-			var v float64
-			if x[n.Kth] == n.Value {
-				v = 0
-			} else {
-				v = math.Inf(-1)
-			}
-			val[i] = v
-		case *Sum:
-			val[i] = logSumExpF(len(n.Edges), func(k int) float64 {
-				return n.Edges[k].Weight + val[n.Edges[k].Node.ID()]
-			})
-		case *Prd:
-			prd := 0.0
-			for _, e := range n.Edges {
-				prd += val[e.Node.ID()]
-			}
-			val[i] = prd
-		}
-	}
-	return val[at]
 }
 
 func BeamSearchSerial(ctx context.Context, spn SPN, xps []XP, beamSize int) XP {
@@ -401,4 +376,44 @@ func PrbKSerial(spn SPN, k int) []XP {
 	}
 	wg.Wait()
 	return res
+}
+func EvalXBatchSerial(spn SPN, xs [][]int) []XP {
+	xps := make([]XP, len(xs))
+	for i, x := range xs {
+		xps[i] = XP{x, spn.EvalX(x)}
+	}
+	return xps
+}
+
+func TopKMaxMaxTimeout(spn SPN, k int) [][]int {
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(*TIMEOUT)*time.Second)
+	ls := make([][]*Link, len(spn.Nodes))
+	for i, n := range spn.Nodes {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+		}
+		switch n := n.(type) {
+		case *Trm:
+			ls[i] = []*Link{{P: 0, Trm: n}}
+		case *Sum:
+			for _, e := range n.Edges {
+				ls[i] = mergeSumLink(ls[i], ls[e.Node.ID()], 0, e.Weight, k)
+			}
+		case *Prd:
+			for _, e := range n.Edges {
+				ls[i] = mergePrdLink(ls[i], ls[e.Node.ID()], k)
+			}
+		}
+	}
+	if k > len(ls[len(spn.Nodes)-1]) {
+		k = len(ls[len(spn.Nodes)-1])
+	}
+	xs := make([][]int, k)
+	for i := range xs {
+		xs[i] = make([]int, len(spn.Schema))
+		topKMaxMaxDFS(ls[len(spn.Nodes)-1][i], xs[i])
+	}
+	return xs
 }
