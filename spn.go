@@ -564,3 +564,92 @@ func (spn SPN) StageSPN(q []int) SPN {
 	}
 	return SPN{nodes, schema}
 }
+
+func (spn SPN) FastStageSPN(q []int) SPN {
+	varCnt := 0
+	for _, c := range q {
+		if c == -1 {
+			varCnt++
+		}
+	}
+	if varCnt == 0 {
+		log.Println(q)
+		log.Fatal("q has no -1")
+	}
+	nn := len(spn.Nodes)
+	ns := make([]Node, nn)
+	we := make([]float64, nn)
+	ch := make([]bool, nn)
+	for i, n := range spn.Nodes {
+		switch n := n.(type) {
+		case *Trm:
+			if q[n.Kth] == -1 {
+				ns[i] = n
+			} else {
+				w := math.Inf(-1)
+				if n.Value == 0 && q[n.Kth] == 0 {
+					w = 0
+				}
+				if n.Value == 1 && q[n.Kth] == 1 {
+					w = 0
+				}
+				we[i] = w
+				ch[i] = true
+			}
+		case *Sum:
+			chi := false
+			for _, e := range n.Edges {
+				if ch[e.Node.ID()] {
+					chi = true
+					break
+				}
+			}
+			if chi {
+				if ns[n.Edges[0].Node.ID()] == nil {
+					we[i] = logSumExpF(len(n.Edges), func(k int) float64 {
+						return n.Edges[k].Weight + we[n.Edges[k].Node.ID()]
+					})
+				} else {
+					es := make([]SumEdge, len(n.Edges))
+					for j, e := range n.Edges {
+						es[j] = SumEdge{e.Weight + we[e.Node.ID()], ns[e.Node.ID()]}
+					}
+					ns[i] = &Sum{Edges: es, id: n.id}
+				}
+				ch[i] = true
+			} else {
+				ns[i] = n
+			}
+		case *Prd:
+			chi := false
+			for _, e := range n.Edges {
+				if ch[e.Node.ID()] {
+					chi = true
+					break
+				}
+			}
+			if chi {
+				es := make([]PrdEdge, 0, len(n.Edges))
+				w := 0.0
+				for _, e := range n.Edges {
+					w += we[e.Node.ID()]
+					if ns[e.Node.ID()] != nil {
+						es = append(es, PrdEdge{ns[e.Node.ID()]})
+					}
+				}
+				we[i] = w
+				if len(es) > 0 {
+					ns[i] = &Prd{Edges: es, id: n.id}
+				}
+				ch[i] = true
+			} else {
+				ns[i] = n
+			}
+		}
+	}
+	if _, ok := ns[nn-1].(*Sum); !ok {
+		//ns[nn] = &Sum{Edges: []SumEdge{{we[nn-1], ns[nn-1]}}}
+		log.Println("Last node is not Sum")
+	}
+	return SPN{ns, spn.Schema}
+}
