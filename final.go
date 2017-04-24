@@ -173,16 +173,21 @@ func KBTMethod(spn SPN) float64 {
 	return MaxXP(EvalXBatchSerial(spn, xs)).P
 }
 func MPMethod(spn SPN) float64 {
-	return 0.0
+	return ExactMP(spn, math.Inf(-1))
 }
 func FCMethod(spn SPN) float64 {
-	return 0.0
+	return ExactFC(spn, math.Inf(-1))
 }
 func ORDERINGMethod(spn SPN) float64 {
-	return 0.0
+	return ExactORDERING(spn, math.Inf(-1))
 }
 func STAGEMethod(spn SPN) float64 {
-	return 0.0
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(*TIMEOUT)*time.Second)
+	x := make([]int, len(spn.Schema))
+	for i := range x {
+		x[i] = -1
+	}
+	return ExactSTAGE(ctx, spn, x, math.Inf(-1))
 }
 
 const (
@@ -416,4 +421,266 @@ func TopKMaxMaxTimeout(spn SPN, k int) [][]int {
 		topKMaxMaxDFS(ls[len(spn.Nodes)-1][i], xs[i])
 	}
 	return xs
+}
+func ExactMP(spn SPN, baseline float64) float64 {
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(*TIMEOUT)*time.Second)
+	x := make([]int, len(spn.Schema))
+	return dfsMP(ctx, spn, x, 0, baseline)
+}
+
+func dfsMP(ctx context.Context, spn SPN, x []int, xi int, baseline float64) float64 {
+	select {
+	case <-ctx.Done():
+		return baseline
+	default:
+	}
+
+	if xi == len(spn.Schema) {
+		return math.Max(baseline, eval(spn, x, xi))
+	}
+	x[xi] = 0
+	if eval(spn, x, xi+1) > baseline {
+		baseline = math.Max(baseline, dfsMP(ctx, spn, x, xi+1, baseline))
+	}
+	x[xi] = 1
+	if eval(spn, x, xi+1) > baseline {
+		baseline = math.Max(baseline, dfsMP(ctx, spn, x, xi+1, baseline))
+	}
+	return baseline
+}
+
+func ExactFC(spn SPN, baseline float64) float64 {
+	x := make([]int, len(spn.Schema))
+	for i := range x {
+		x[i] = -1
+	}
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(*TIMEOUT)*time.Second)
+	return dfsFC(ctx, spn, x, baseline)
+}
+
+func dfsFC(ctx context.Context, spn SPN, x []int, baseline float64) float64 {
+	select {
+	case <-ctx.Done():
+		return baseline
+	default:
+	}
+
+	x2 := make([]int, len(x))
+	copy(x2, x)
+	x = x2
+	as := make([][]float64, len(x))
+	for i := range as {
+		as[i] = make([]float64, 2)
+		if x[i] == 0 || x[i] == -1 {
+			as[i][0] = 1
+		}
+		if x[i] == 1 || x[i] == -1 {
+			as[i][1] = 1
+		}
+	}
+	var d [][]float64
+	for {
+		updated := false
+		d = derivativeOfAssignment(spn, as)
+		for i := range x {
+			if x[i] == -1 {
+				xi0 := d[i][0]
+				xi1 := d[i][1]
+
+				if xi0 < baseline && xi1 < baseline {
+					return baseline
+				}
+				if xi0 < baseline {
+					x[i] = 1
+					as[i][0] = 0
+					updated = true
+				}
+				if xi1 < baseline {
+					x[i] = 0
+					as[i][1] = 0
+					updated = true
+				}
+			}
+		}
+		if !updated {
+			break
+		}
+	}
+	maxVarID := -1
+	maxValID := 0
+	for i := range x {
+		if x[i] == -1 {
+			maxVarID = i
+			break
+		}
+	}
+	if i := maxVarID; i != -1 {
+		x[i] = maxValID
+		baseline = math.Max(dfsFC(ctx, spn, x, baseline), baseline)
+		x[i] = maxValID ^ 1
+		baseline = math.Max(dfsFC(ctx, spn, x, baseline), baseline)
+		return baseline
+	}
+	return math.Max(baseline, math.Max(d[0][0], d[0][1]))
+}
+
+func ExactORDERING(spn SPN, baseline float64) float64 {
+	x := make([]int, len(spn.Schema))
+	for i := range x {
+		x[i] = -1
+	}
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(*TIMEOUT)*time.Second)
+	return dfsORDERING(ctx, spn, x, baseline)
+}
+
+func dfsORDERING(ctx context.Context, spn SPN, x []int, baseline float64) float64 {
+	select {
+	case <-ctx.Done():
+		return baseline
+	default:
+	}
+
+	x2 := make([]int, len(x))
+	copy(x2, x)
+	x = x2
+	as := make([][]float64, len(x))
+	for i := range as {
+		as[i] = make([]float64, 2)
+		if x[i] == 0 || x[i] == -1 {
+			as[i][0] = 1
+		}
+		if x[i] == 1 || x[i] == -1 {
+			as[i][1] = 1
+		}
+	}
+	var d [][]float64
+	for {
+		updated := false
+		d = derivativeOfAssignment(spn, as)
+		for i := range x {
+			if x[i] == -1 {
+				xi0 := d[i][0]
+				xi1 := d[i][1]
+
+				if xi0 < baseline && xi1 < baseline {
+					return baseline
+				}
+				if xi0 < baseline {
+					x[i] = 1
+					as[i][0] = 0
+					updated = true
+				}
+				if xi1 < baseline {
+					x[i] = 0
+					as[i][1] = 0
+					updated = true
+				}
+			}
+		}
+		if !updated {
+			break
+		}
+	}
+	maxVarID := -1
+	maxValID := -1
+	maxDer := math.Inf(-1)
+	for i := range x {
+		if x[i] == -1 {
+			crtValID := 0
+			crtDer := d[i][0]
+			if d[i][0] < d[i][1] {
+				crtValID = 1
+				crtDer = d[i][1]
+			}
+			if maxVarID == -1 || maxDer < crtDer {
+				maxVarID = i
+				maxValID = crtValID
+				maxDer = crtDer
+			}
+		}
+	}
+	if i := maxVarID; i != -1 {
+		x[i] = maxValID
+		baseline = math.Max(dfsORDERING(ctx, spn, x, baseline), baseline)
+		x[i] = maxValID ^ 1
+		baseline = math.Max(dfsORDERING(ctx, spn, x, baseline), baseline)
+		return baseline
+	}
+	return math.Max(baseline, math.Max(d[0][0], d[0][1]))
+}
+
+func ExactSTAGE(ctx context.Context, spn SPN, x []int, best float64) float64 {
+	select {
+	case <-ctx.Done():
+		return best
+	default:
+	}
+
+	x2 := make([]int, len(x))
+	copy(x2, x)
+	x = x2
+	var d [][]float64
+	for {
+		updated := false
+		d = derivativeOfAssignmentX(spn, x)
+		for i := range x {
+			if x[i] == -1 {
+				if d[i][0] <= best && d[i][1] <= best {
+					return best
+				}
+				if d[i][0] <= best {
+					x[i] = 1
+					updated = true
+				}
+				if d[i][1] <= best {
+					x[i] = 0
+					updated = true
+				}
+			}
+		}
+		if !updated {
+			break
+		}
+	}
+	cnt := 0
+	for i := range x {
+		if x[i] == -1 {
+			cnt++
+		}
+	}
+	if cnt > 1 && len(x)-cnt >= 5 {
+		spn = spn.StageSPN(x)
+		x = make([]int, len(spn.Schema))
+		for i := range x {
+			x[i] = -1
+		}
+		d = derivativeOfAssignmentX(spn, x)
+	}
+	varID := -1
+	valID := -1
+	for i := range x {
+		if x[i] == -1 {
+			var valI int
+			if d[i][0] < d[i][1] {
+				valI = 1
+			} else {
+				valI = 0
+			}
+			if varID == -1 || d[varID][valID] < d[i][valI] {
+				varID = i
+				valID = valI
+			}
+		}
+	}
+	if varID == -1 {
+		return math.Max(best, d[0][x[0]])
+	}
+	if cnt == 1 {
+		return d[varID][valID]
+	}
+	x[varID] = valID
+	best = ExactSTAGE(ctx, spn, x, best)
+	x[varID] = 1 - valID
+	best = ExactSTAGE(ctx, spn, x, best)
+	return best
 }
