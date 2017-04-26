@@ -38,6 +38,16 @@ var (
 
 	TIMEOUT     = flag.Int("TIMEOUT", 600, "Timeout (in seconds)")
 	GROUP_COUNT = flag.Int("GROUP_COUNT", 25, "Group count")
+
+	COLUMN = flag.String("COLUMN", "BT", "Columns (delimited by ',')")
+	TITLE  = flag.String("TITLE", "", "Title")
+
+	WINCNT  = flag.Bool("WINCNT", false, "Summary table")
+	FINISH  = flag.Bool("FINISH", false, "Finish before time limit exceed")
+	TIMEAVG = flag.Bool("TIMEAVG", false, "Average time")
+	RESAVG  = flag.Bool("RESAVG", false, "Average result")
+	RESLSE  = flag.Bool("RESLSE", false, "Log Sum Exp result")
+	BATTLE  = flag.Bool("BATTLE", false, "Battle")
 )
 
 func FinalExperiment() {
@@ -65,6 +75,19 @@ func FinalExperiment() {
 		mapInference("ORDERING", ORDERINGMethod)
 	case *STAGE:
 		mapInference("STAGE", STAGEMethod)
+
+	case *WINCNT:
+		summary("WINCNT", summaryWINCNT)
+	case *FINISH:
+		summary("FINISH", summaryFINISH)
+	case *TIMEAVG:
+		summary("TIMEAVG", summaryTIMEAVG)
+	case *RESAVG:
+		summary("RESAVG", summaryRESAVG)
+	case *RESLSE:
+		summary("RESLSE", summaryRESLSE)
+	case *BATTLE:
+		summaryBATTLE("BATTLE")
 	}
 }
 
@@ -195,6 +218,7 @@ const (
 	SPN_DIR        = EXPERIMENT_DIR + "learn.spn/"
 	QEH_DIR        = EXPERIMENT_DIR + "map.qeh/"
 	RESULT_DIR     = EXPERIMENT_DIR + "result.csv/"
+	SUMMARY_DIR    = EXPERIMENT_DIR + "summary.csv/"
 
 	QUERY_COUNT = 1000
 )
@@ -683,4 +707,243 @@ func ExactSTAGE(ctx context.Context, spn SPN, x []int, best float64) float64 {
 	x[varID] = 1 - valID
 	best = ExactSTAGE(ctx, spn, x, best)
 	return best
+}
+
+type ResTime struct {
+	Result float64
+	Time   float64
+}
+
+type summaryFunc func(resData [][]ResTime) []string
+
+func summary(title string, sf summaryFunc) {
+	if *TITLE != "" {
+		title = *TITLE
+	}
+	cols := strings.Split(*COLUMN, ",")
+	data := []byte{}
+	data = append(data, []byte(title)...)
+	for _, c := range cols {
+		data = append(data, ',')
+		data = append(data, []byte(c)...)
+	}
+	data = append(data, '\n')
+	for _, dataset := range DATASETS {
+		rtss := make([][]ResTime, len(cols))
+		for ri := range rtss {
+			resFile := fmt.Sprintf("%s%s/%s/%s/%s", RESULT_DIR, *QEH, cols[ri], "result", dataset)
+			ress := readFloat(resFile)
+			timeFile := fmt.Sprintf("%s%s/%s/%s/%s", RESULT_DIR, *QEH, cols[ri], "time", dataset)
+			times := readFloat(timeFile)
+			rts := make([]ResTime, len(ress))
+			for j := range rts {
+				rts[j] = ResTime{
+					Result: ress[j],
+					Time:   times[j],
+				}
+			}
+			rtss[ri] = rts
+		}
+		data = append(data, []byte(dataset)...)
+		row := sf(rtss)
+		for _, r := range row {
+			data = append(data, ',')
+			data = append(data, []byte(r)...)
+		}
+		data = append(data, '\n')
+	}
+	os.Mkdir(SUMMARY_DIR+*QEH, 0777)
+	if err := ioutil.WriteFile(SUMMARY_DIR+*QEH+"/"+title, data, 0777); err != nil {
+		log.Fatal("WriteFile:", err)
+	}
+}
+
+func readFloat(filename string) []float64 {
+	raw, err := ioutil.ReadFile(filename)
+	if err != nil {
+		log.Fatal("ReadFile:", err)
+	}
+	raw = bytes.TrimSpace(raw)
+	raws := bytes.Split(raw, []byte{'\n'})
+	if len(raws) != QUERY_COUNT {
+		log.Fatal("Result count is not equal:", len(raws), QUERY_COUNT)
+	}
+	fs := make([]float64, len(raws))
+	for fi, r := range raws {
+		fs[fi] = parseFloat(string(r))
+	}
+	return fs
+}
+
+func summaryWINCNT(resData [][]ResTime) []string {
+	cnt := make([]int, len(resData))
+	for j := range resData[0] {
+		max := math.Inf(-1)
+		for i := range resData {
+			r := resData[i][j].Result
+			if !math.IsNaN(r) {
+				max = math.Max(max, r)
+			}
+		}
+		for i := range resData {
+			r := resData[i][j].Result
+			if !math.IsNaN(r) && floatEqual(r, max) {
+				cnt[i]++
+			}
+		}
+	}
+	res := i2s(cnt)
+	return res
+}
+func i2s(cnt []int) []string {
+	res := make([]string, len(cnt))
+	for i := range cnt {
+		res[i] = fmt.Sprint(cnt[i])
+	}
+	return res
+}
+func f2s(cnt []float64) []string {
+	res := make([]string, len(cnt))
+	for i := range cnt {
+		res[i] = fmt.Sprint(cnt[i])
+	}
+	return res
+}
+
+const EPSILON = 1e-6
+
+func floatEqual(x float64, y float64) bool {
+	xsy := x - y
+	if -EPSILON <= xsy && xsy <= EPSILON {
+		return true
+	}
+	if -EPSILON <= x && x <= EPSILON || -EPSILON <= y && y <= EPSILON {
+		return false
+	}
+	rx := xsy / x
+	ry := xsy / y
+	return (-EPSILON <= rx && rx <= EPSILON) || (-EPSILON <= ry && ry <= EPSILON)
+}
+
+func summaryFINISH(data [][]ResTime) []string {
+	cnt := make([]int, len(data))
+	for i := range data {
+		for j := range data[i] {
+			if data[i][j].Time < float64(*TIMEOUT-5) {
+				cnt[i]++
+			}
+		}
+	}
+	return i2s(cnt)
+}
+
+func summaryTIMEAVG(data [][]ResTime) []string {
+	res := make([]float64, len(data))
+	for i := range data {
+		sum := 0.0
+		for j := range data[i] {
+			sum += data[i][j].Time
+		}
+		sum /= float64(len(data[i]))
+		res[i] = sum
+	}
+	return f2s(res)
+}
+
+func summaryRESAVG(data [][]ResTime) []string {
+	res := make([]float64, len(data))
+	for i := range data {
+		sum := 0.0
+		for j := range data[i] {
+			r := data[i][j].Result
+			if math.IsNaN(r) {
+				sum = math.NaN()
+				break
+			}
+			sum += r
+		}
+		sum /= float64(len(data[i]))
+		res[i] = sum
+	}
+	return f2s(res)
+}
+
+func summaryRESLSE(data [][]ResTime) []string {
+	res := make([]float64, len(data))
+	for i := range data {
+		sum := math.Inf(-1)
+		for j := range data[i] {
+			r := data[i][j].Result
+			if math.IsNaN(r) {
+				sum = math.NaN()
+				break
+			}
+			sum = logSumExp(sum, r)
+		}
+		res[i] = sum
+	}
+	return f2s(res)
+}
+
+func summaryBATTLE(title string) {
+	if *TITLE != "" {
+		title = *TITLE
+	}
+	cols := strings.Split(*COLUMN, ",")
+	data := []byte{}
+	data = append(data, []byte(title)...)
+	for _, c := range cols {
+		data = append(data, ',')
+		data = append(data, []byte(c)...)
+	}
+	data = append(data, '\n')
+	res := make([][]int, len(cols))
+	for i := range res {
+		res[i] = make([]int, len(cols))
+	}
+	for _, dataset := range DATASETS {
+		rtss := make([][]ResTime, len(cols))
+		for ri := range rtss {
+			resFile := fmt.Sprintf("%s%s/%s/%s/%s", RESULT_DIR, *QEH, cols[ri], "result", dataset)
+			ress := readFloat(resFile)
+			timeFile := fmt.Sprintf("%s%s/%s/%s/%s", RESULT_DIR, *QEH, cols[ri], "time", dataset)
+			times := readFloat(timeFile)
+			rts := make([]ResTime, len(ress))
+			for j := range rts {
+				rts[j] = ResTime{
+					Result: ress[j],
+					Time:   times[j],
+				}
+			}
+			rtss[ri] = rts
+		}
+		battleDataset(res, rtss)
+	}
+	for i := range res {
+		data = append(data, []byte(cols[i])...)
+		for j := range res[i] {
+			data = append(data, ',')
+			data = append(data, []byte(fmt.Sprint(res[i][j]))...)
+		}
+		data = append(data, '\n')
+	}
+	os.Mkdir(SUMMARY_DIR+*QEH, 0777)
+	if err := ioutil.WriteFile(SUMMARY_DIR+*QEH+"/"+title, data, 0777); err != nil {
+		log.Fatal("WriteFile:", err)
+	}
+}
+func battleDataset(res [][]int, data [][]ResTime) {
+	for c := range data[0] {
+		for i := range data {
+			for j := range data {
+				ri := data[i][c]
+				rj := data[j][c]
+				if !floatEqual(ri.Time, rj.Time) && ri.Time < float64(*TIMEOUT-5) && ri.Time < rj.Time &&
+					!math.IsNaN(ri.Result) && (math.IsNaN(rj.Result) ||
+					!floatEqual(ri.Result, rj.Result) && ri.Result > rj.Result) {
+					res[i][j]++
+				}
+			}
+		}
+	}
 }
