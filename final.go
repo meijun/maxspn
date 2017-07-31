@@ -372,17 +372,21 @@ func BeamSearchSerial(ctx context.Context, spn SPN, xps []XP, beamSize int) XP {
 			return best
 		default:
 		}
-		xps = nextGensSerial(xps, spn)
+		xps = nextGensSerial(ctx, xps, spn)
 	}
 	return best
 }
 
-func nextGensSerial(xps []XP, spn SPN) []XP {
+func nextGensSerial(ctx context.Context, xps []XP, spn SPN) []XP {
 	res := []XP{}
 	resChan := make([]chan []XP, len(xps))
 	for i, xp := range xps {
 		ch := make(chan []XP, 1)
-		nextGenD(xp, spn, ch)
+		select {
+		case <-ctx.Done():
+		default:
+			nextGenD(xp, spn, ch)
+		}
 		resChan[i] = ch
 	}
 	for _, ch := range resChan {
