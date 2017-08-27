@@ -1,0 +1,80 @@
+digraph G {
+    edge[arrowhead=vee]
+
+    SA -> PA0[label=<P(a)>]
+    SA -> PA1[label=<P(a&#773;)>]
+    PA0 -> lA0[shape=vee]
+    PA0 -> SB0
+    PA1 -> SB1
+    PA1 -> lA1
+    SB0 -> PB0[label=<P(b | a)>]
+    SB0 -> PB1[label=<P(b&#773; | a)>]
+    SB1 -> PB0[label=<P(b | a&#773;)>]
+    SB1 -> PB1[label=<P(b&#773; | a&#773;)>]
+    PB0 -> lB0
+    PB0 -> SC0
+    PB1 -> SC1
+    PB1 -> lB1
+    SC0 -> PC0[label=<P(c | b)>]
+    SC0 -> PC1[label=<P(c&#773; | b)>]
+    SC1 -> PC0[label=<P(c | b&#773;)>]
+    SC1 -> PC1[label=<P(c&#773; | b&#773;)>]
+    PC0 -> lC0
+    PC1 -> lC1
+
+    SA[label=<+>]
+    SB0[label=<+>]
+    SB1[label=<+>]
+    SC0[label=<+>]
+    SC1[label=<+>]
+
+    PA0[label=<×>]
+    PA1[label=<×>]
+    PB0[label=<×>]
+    PB1[label=<×>]
+    PB0[label=<×>]
+    PB1[label=<×>]
+    PC0[label=<×>]
+    PC1[label=<×>]
+
+    lA0[label=<&lambda;<sub>A=a</sub>>]
+    lA1[label=<&lambda;<sub>A=a&#773;</sub>>]
+    lB0[label=<&lambda;<sub>B=b</sub>>]
+    lB1[label=<&lambda;<sub>B=b&#773;</sub>>]
+    lC0[label=<&lambda;<sub>C=c</sub>>]
+    lC1[label=<&lambda;<sub>C=c&#773;</sub>>]
+
+    SB0[group=g0]
+    SC0[group=g0]
+    PA0[group=g0]
+    PB0[group=g0]
+    PC0[group=g0]
+
+    SB1[group=g1]
+    SC1[group=g1]
+    PA1[group=g1]
+    PB1[group=g1]
+    PC1[group=g1]
+
+    SA[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+    SB0[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+    SB1[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+    SC0[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+    SC1[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+
+    PA0[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+    PA1[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+    PB0[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+    PB1[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+    PB0[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+    PB1[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+    PC0[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+    PC1[shape=circle, fontsize=25, fixedsize=true, width=0.39]
+
+    lA0[shape=none]
+    lA1[shape=none]
+    lB0[shape=none]
+    lB1[shape=none]
+    lC0[shape=none]
+    lC1[shape=none]
+}
