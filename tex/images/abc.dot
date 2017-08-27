@@ -3,7 +3,7 @@ digraph G {
 
     SA -> PA0[label=<P(a)>]
     SA -> PA1[label=<P(a&#773;)>]
-    PA0 -> lA0[shape=vee]
+    PA0 -> lA0
     PA0 -> SB0
     PA1 -> SB1
     PA1 -> lA1
